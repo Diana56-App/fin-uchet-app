@@ -56,6 +56,16 @@ app.post('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Явный корень
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Health-check для Render
+app.get('/healthz', (req, res) => {
+  res.status(200).send('ok');
+});
+
 // --- Запуск ---
 app.listen(PORT, () => {
   console.log(`Server started at http://localhost:${PORT}`);
