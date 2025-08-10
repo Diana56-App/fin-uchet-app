@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Финансы Сталкер</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      background: #f4f5f7;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0; padding: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 8px 36px #d0c6db42;
+      padding: 20px 0 40px 0;
+    }
+    h1 {
+      text-align: left;
+      margin-left: 30px;
+      color: #b20054;
+      font-size: 2.2em;
+      font-weight: 700;
+    }
+    .box {
+      background: #fff;
+      max-width: 700px;
+      margin: 35px auto;
+      padding: 40px;
+      border-radius: 18px;
+      box-shadow: 0 4px 20px #d0c6db15;
+      min-height: 150px;
+    }
+    .btn {
+      background: #b20054;
+      color: #fff;
+      border: none;
+      padding: 10px 26px;
+      border-radius: 8px;
+      font-size: 1em;
+      margin-bottom: 20px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #82003d; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 25px;
+    }
+    th, td {
+      border-bottom: 1px solid #eee;
+      padding: 10px 8px;
+      text-align: left;
+      font-size: 1.05em;
+    }
+    th {
+      background: #fde7f3;
+      color: #b20054;
+      font-weight: 600;
+    }
+    form {
+      margin-bottom: 25px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: end;
+    }
+    form input, form select {
+      padding: 7px 9px;
+      border-radius: 5px;
+      border: 1px solid #bbb;
+      font-size: 1em;
+      width: 160px;
+    }
+    @media (max-width: 650px) {
+      .container, .box { padding: 10px !important; }
+      form { flex-direction: column; gap: 7px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Финансы Сталкер</h1>
+    <div class="box" id="payments-box">
+      <!-- Тут появится интерфейс -->
+    </div>
+  </div>
+
+  <script src="payments.js"></script>
+</body>
+</html>
