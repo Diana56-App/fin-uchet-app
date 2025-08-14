@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>fin-uchet — проверка фронта</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; max-width: 980px; margin: 24px auto; }
+    body { font-family: system-ui, Arial, sans-serif; max-width: 1200px; margin: 24px auto; }
     h1 { margin: 0 0 16px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .card { border: 1px solid #e5e5e5; border-radius: 10px; padding: 14px; }
     pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 10px; text-align: left; }
+    th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 10px; text-align: left; vertical-align: top; }
     th { background: #f8f8f8; }
     .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .controls { margin: 16px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -24,6 +24,7 @@
     .hint { font-size: 12px; color: #666; margin-top: -6px; }
     .danger { background:#ffefef; }
     .actions { display: flex; gap: 6px; }
+    .muted { color:#777; }
   </style>
 </head>
 <body>
@@ -82,7 +83,7 @@
   </div>
 
   <h3>Payments</h3>
-  <div class="card">
+  <div class="card" style="overflow:auto;">
     <table>
       <thead>
         <tr>
@@ -91,11 +92,15 @@
           <th>Сумма</th>
           <th>Категория</th>
           <th>Комментарий</th>
+          <th>Сделка</th>
+          <th>Контакт</th>
+          <th>Компания</th>
+          <th>Проект</th>
           <th>Действия</th>
         </tr>
       </thead>
       <tbody id="rows">
-        <tr><td colspan="6" style="text-align:center; color:#777;">Пусто</td></tr>
+        <tr><td colspan="10" style="text-align:center; color:#777;">Пусто</td></tr>
       </tbody>
     </table>
   </div>
@@ -157,11 +162,17 @@
       if (!el('inDate').value) el('inDate').value = today;
     }
 
+    function nameOrId(name, id) {
+      if (name && String(name).trim()) return name;
+      if (id) return '#' + id;
+      return '';
+    }
+
     function renderPayments() {
       const tbody = el('rows');
       tbody.innerHTML = '';
       if (!paymentsCache.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#777;">Платежей нет</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#777;">Платежей нет</td></tr>';
         return;
       }
 
@@ -181,6 +192,10 @@
               </select>
             </td>
             <td><input type="text" value="${p.comment ?? ''}" data-field="comment" /></td>
+            <td class="muted">${nameOrId(p.deal_name, p.deal_id)}</td>
+            <td class="muted">${nameOrId(p.contact_name, p.contact_id)}</td>
+            <td class="muted">${nameOrId(p.company_name, p.company_id)}</td>
+            <td class="muted">${nameOrId(p.project_name, p.project_id)}</td>
             <td class="actions">
               <button data-save="${p.id}" class="primary">Сохранить</button>
               <button data-cancel="${p.id}" class="ghost">Отмена</button>
@@ -193,6 +208,10 @@
             <td>${fmtMoney(p.amount)}</td>
             <td>${p.category ?? ''}</td>
             <td>${p.comment ?? ''}</td>
+            <td class="muted">${nameOrId(p.deal_name, p.deal_id)}</td>
+            <td class="muted">${nameOrId(p.contact_name, p.contact_id)}</td>
+            <td class="muted">${nameOrId(p.company_name, p.company_id)}</td>
+            <td class="muted">${nameOrId(p.project_name, p.project_id)}</td>
             <td class="actions">
               <button data-edit="${p.id}">Редактировать</button>
               <button data-del="${p.id}">Удалить</button>
@@ -287,7 +306,7 @@
       }
     }
 
-    // добавление нового платежа
+    // добавление нового платежа (верхняя форма)
     el('btnAdd').addEventListener('click', async () => {
       show(el('loading'), true);
       set(el('error'), '');
