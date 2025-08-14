@@ -55,83 +55,98 @@
     </table>
   </div>
 
-  <script>
-    const el = (id) => document.getElementById(id);
-    const show = (n, v) => n.style.display = v ? '' : 'none';
-    const set = (n, v) => n.textContent = v;
+ <script>
+  const el = (id) => document.getElementById(id);
+  const show = (n, v) => n.style.display = v ? '' : 'none';
+  const set = (n, v) => n.textContent = v;
 
-    async function getJSON(path, options) {
-      const r = await fetch(path, options);
-      if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`);
-      const ct = r.headers.get('content-type') || '';
-      return ct.includes('application/json') ? r.json() : r.text();
+  // Форматтеры
+  const fmtDate = (iso) => {
+    if (!iso) return '';
+    // iso может быть '2025-08-20T00:00:00.000Z' или '2025-08-20'
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('ru-RU');
+  };
+  const fmtMoney = (v) => {
+    if (v === null || v === undefined || v === '') return '';
+    const n = Number(v);
+    return isNaN(n)
+      ? String(v)
+      : n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  async function getJSON(path, options) {
+    const r = await fetch(path, options);
+    if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`);
+    const ct = r.headers.get('content-type') || '';
+    return ct.includes('application/json') ? r.json() : r.text();
+  }
+
+  async function loadAll() {
+    show(el('loading'), true);
+    set(el('error'), '');
+    try {
+      const [h, d, p] = await Promise.all([
+        getJSON('/health'),
+        getJSON('/dbcheck'),
+        getJSON('/payments'),
+      ]);
+      set(el('health'), JSON.stringify(h));
+      set(el('db'), JSON.stringify(d));
+      renderPayments(Array.isArray(p) ? p : []);
+    } catch (e) {
+      set(el('error'), e.message || 'Ошибка загрузки');
+    } finally {
+      show(el('loading'), false);
     }
+  }
 
-    async function loadAll() {
-      show(el('loading'), true);
-      set(el('error'), '');
-      try {
-        const [h, d, p] = await Promise.all([
-          getJSON('/health'),
-          getJSON('/dbcheck'),
-          getJSON('/payments'),
-        ]);
-        set(el('health'), JSON.stringify(h));
-        set(el('db'), JSON.stringify(d));
-        renderPayments(Array.isArray(p) ? p : []);
-      } catch (e) {
-        set(el('error'), e.message || 'Ошибка загрузки');
-      } finally {
-        show(el('loading'), false);
-      }
+  function renderPayments(items) {
+    const tbody = el('rows');
+    tbody.innerHTML = '';
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#777;">Платежей нет</td></tr>';
+      return;
     }
-
-    function renderPayments(items) {
-      const tbody = el('rows');
-      tbody.innerHTML = '';
-      if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#777;">Платежей нет</td></tr>';
-        return;
-      }
-      for (const p of items) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${p.id ?? ''}</td>
-          <td>${p.date ?? ''}</td>
-          <td>${p.amount ?? ''}</td>
-          <td>${p.category ?? ''}</td>
-          <td>${p.comment ?? ''}</td>
-        `;
-        tbody.appendChild(tr);
-      }
+    for (const p of items) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${p.id ?? ''}</td>
+        <td>${fmtDate(p.date)}</td>
+        <td>${fmtMoney(p.amount)}</td>
+        <td>${p.category ?? ''}</td>
+        <td>${p.comment ?? ''}</td>
+      `;
+      tbody.appendChild(tr);
     }
+  }
 
-    async function addDemo() {
-      show(el('loading'), true);
-      set(el('error'), '');
-      try {
-        const today = new Date().toISOString().slice(0,10);
-        await getJSON('/payments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            date: today,
-            amount: 123.45,
-            category: 'Тест',
-            comment: 'Добавлено с test.html'
-          })
-        });
-        await loadAll();
-      } catch (e) {
-        set(el('error'), e.message || 'Ошибка добавления');
-      } finally {
-        show(el('loading'), false);
-      }
+  async function addDemo() {
+    show(el('loading'), true);
+    set(el('error'), '');
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      await getJSON('/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: today,
+          amount: 123.45,
+          category: 'Тест',
+          comment: 'Добавлено с test.html'
+        })
+      });
+      await loadAll();
+    } catch (e) {
+      set(el('error'), e.message || 'Ошибка добавления');
+    } finally {
+      show(el('loading'), false);
     }
+  }
 
-    el('btnReload').addEventListener('click', loadAll);
-    el('btnAdd').addEventListener('click', addDemo);
-    loadAll();
-  </script>
+  el('btnReload').addEventListener('click', loadAll);
+  el('btnAdd').addEventListener('click', addDemo);
+  loadAll();
+</script>
 </body>
 </html>
