@@ -52,7 +52,7 @@
       <div>
         <label>Дата</label><br />
         <input id="inDate" type="date" />
-        <div class="hint">Если пусто — возьмём сегодня</div>
+        <div class="hint">Если пусто - возьмём сегодня</div>
       </div>
       <div>
         <label>Сумма</label><br />
@@ -121,11 +121,7 @@
         ? String(v)
         : n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
-    const toInputDate = (iso) => {
-      if (!iso) return '';
-      // ждём 'YYYY-MM-DD' или ISO
-      return String(iso).slice(0,10);
-    };
+    const toInputDate = (iso) => String(iso || '').slice(0,10);
 
     async function getJSON(path, options) {
       const r = await fetch(path, options);
@@ -187,33 +183,42 @@
         `;
         tbody.appendChild(tr);
       }
-      // обработчики
-      tbody.querySelectorAll('button[data-del]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = Number(btn.getAttribute('data-del'));
-          if (!id) return;
+
+      // ВАЖНО: делегирование — один обработчик на tbody
+      tbody.onclick = async (e) => {
+        const btn = e.target.closest('button[data-edit], button[data-del]');
+        if (!btn) return;
+        const id = Number(btn.dataset.edit || btn.dataset.del);
+        if (!id) return;
+
+        if (btn.hasAttribute('data-del')) {
           if (!confirm(`Удалить платёж #${id}?`)) return;
           await deletePayment(id, btn.closest('tr'));
-        });
-      });
-      tbody.querySelectorAll('button[data-edit]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = Number(btn.getAttribute('data-edit'));
-          if (!id) return;
-          startEdit(id, items.find(x => x.id === id));
-        });
-      });
+          return;
+        }
+
+        // Редактирование
+        const row = [...tbody.querySelectorAll('tr')].find(tr => Number(tr.dataset.id) === id);
+        // найдём объект p по ячейкам (или можно запросить весь список заново)
+        const cells = row.querySelectorAll('td');
+        const p = {
+          id,
+          date: toInputDate(cells[1]?.textContent?.trim() ? new Date(cells[1].textContent.trim().split('.').reverse().join('-')).toISOString() : ''),
+          amount: cells[2]?.textContent?.trim().replace(/\s/g,'').replace(',','.') || '',
+          category: cells[3]?.textContent?.trim() || '',
+          comment: cells[4]?.textContent?.trim() || ''
+        };
+        startEdit(id, p);
+      };
     }
 
     function startEdit(id, p) {
       editingId = id;
-      // подставляем значения в форму
       el('inDate').value = toInputDate(p?.date);
       el('inAmount').value = (p?.amount ?? '').toString().replace('.', ',');
       ensureCategoryOption(p?.category);
       el('inCategory').value = p?.category ?? '';
       el('inComment').value = p?.comment ?? '';
-      // меняем кнопки
       el('btnAdd').textContent = 'Обновить платёж';
       show(el('btnCancel'), true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -223,7 +228,6 @@
       editingId = null;
       el('btnAdd').textContent = 'Сохранить платёж';
       show(el('btnCancel'), false);
-      // чистим сумму и комментарий; дату и категорию можно оставить
       el('inAmount').value = '';
       el('inComment').value = '';
       prefillDate();
@@ -265,7 +269,6 @@
         }
 
         if (editingId) {
-          // PUT /payments/:id
           await getJSON(`/payments/${editingId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -273,13 +276,11 @@
           });
           cancelEdit();
         } else {
-          // POST /payments
           await getJSON('/payments', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date, amount, category, comment })
           });
-          // очищаем сумму и комментарий
           el('inAmount').value = '';
           el('inComment').value = '';
         }
