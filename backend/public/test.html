@@ -14,7 +14,7 @@
     th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 10px; text-align: left; vertical-align: top; }
     th { background: #f8f8f8; }
     .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .controls { margin: 16px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .controls { margin: 16px 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
     .error { color: crimson; margin-top: 8px; }
     input, select, button { padding: 10px 12px; border: 1px solid #dcdcdc; border-radius: 8px; font: inherit; }
     button { cursor: pointer; }
@@ -23,7 +23,7 @@
     small.muted { color: #888; }
     .hint { font-size: 12px; color: #666; margin-top: -6px; }
     .danger { background:#ffefef; }
-    .actions { display: flex; gap: 6px; }
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .muted { color:#777; }
     #ver { margin-left: 8px; }
 
@@ -36,14 +36,14 @@
     .tag { display:inline-block; font-size: 12px; padding: 2px 8px; border: 1px solid #e5e5e5; border-radius: 999px; margin-left: 8px; color:#555; background:#fafafa; }
 
     /* Подсветка будущих строк: зелёный/розовый. Сумма — чёрная. */
-    tr.future-income td { background: #ecfdf5; }  /* очень светло-зелёный */
-    tr.future-expense td { background: #fff5f5; } /* очень светло-розовый */
+    tr.future-income td { background: #ecfdf5; }
+    tr.future-expense td { background: #fff5f5; }
     tr.future-income .amount,
-    tr.future-expense .amount { color: #111 !important; } /* суммы чёрные */
+    tr.future-expense .amount { color: #111 !important; }
   </style>
 </head>
 <body>
-  <h1>fin-uchet — проверка фронта <small id="ver" class="muted">UI v16</small></h1>
+  <h1>fin-uchet — проверка фронта <small id="ver" class="muted">UI v18</small></h1>
 
   <div class="grid">
     <div class="card">
@@ -58,6 +58,13 @@
 
   <div class="controls">
     <button id="btnReload">Обновить</button>
+
+    <!-- Неброская настройка -->
+    <label style="display:flex; align-items:center; gap:6px; font-size:14px;">
+      <input id="prefSync" type="checkbox" />
+      Битрикс: подтягивать сумму из сделки
+    </label>
+
     <span id="loading" style="display:none;">Загрузка…</span>
     <div id="error" class="error"></div>
   </div>
@@ -151,7 +158,7 @@
     };
     const toYMD = (s) => String(s || '').slice(0,10);
 
-    // Будущее — строго больше сегодняшней даты (сравниваем YYYY-MM-DD)
+    // Будущее — строго больше сегодняшней даты
     const isFuture = (iso) => toYMD(iso) > todayYMD();
 
     // Тип операции по категории
@@ -174,6 +181,16 @@
       if (p.company_id) return `#${p.company_id}`;
       return '';
     };
+
+    // Предпочтение «тянуть сумму» (сохраняем в localStorage)
+    const PREF_KEY = 'bx_sync_amount';
+    const getPrefSync = () => localStorage.getItem(PREF_KEY) === '1';
+    const setPrefSync = (v) => localStorage.setItem(PREF_KEY, v ? '1' : '0');
+
+    // Инициализация чекбокса
+    const prefBox = el('prefSync');
+    prefBox.checked = getPrefSync();
+    prefBox.addEventListener('change', () => setPrefSync(prefBox.checked));
 
     async function getJSON(path, options) {
       const r = await fetch(path, options);
@@ -325,7 +342,7 @@
       }
     }
 
-    // === Битрикс: спрашиваем, подтягивать ли сумму из сделки ===
+    // Битрикс: одна кнопка, логика суммы = настройка ИЛИ сумма пустая
     async function linkBitrix(id) {
       try {
         const dealId = prompt('Укажи ID сделки в Битрикс (число):', '');
@@ -333,7 +350,9 @@
         const dealNum = Number(dealId);
         if (!Number.isFinite(dealNum)) throw new Error('ID сделки должен быть числом');
 
-        const sync = confirm('Подтянуть сумму из сделки и заменить сумму платежа?');
+        const cur = paymentsCache.find(x => x.id === id) || {};
+        const amountEmpty = cur.amount === null || cur.amount === undefined || cur.amount === '' || Number(cur.amount) === 0;
+        const sync = getPrefSync() || amountEmpty;
 
         show(el('loading'), true);
         set(el('error'), '');
@@ -343,7 +362,11 @@
           body: JSON.stringify({ deal_id: dealNum, sync_amount: sync })
         });
         await loadAll();
-        alert(sync ? 'Данные и сумма подтянуты ✅' : 'Данные подтянуты ✅');
+        if (sync) {
+          alert('Данные и сумма подтянуты ✅');
+        } else {
+          alert('Данные подтянуты (сумма без изменений) ✅');
+        }
       } catch (e) {
         set(el('error'), e.message || 'Ошибка связи с Битрикс');
       } finally {
