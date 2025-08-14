@@ -105,12 +105,11 @@
     const show = (n, v) => n.style.display = v ? '' : 'none';
     const set = (n, v) => n.textContent = v;
 
-    let paymentsCache = [];  // список с бэка
-    let editingRowId = null; // id строки в режиме редактирования
+    let paymentsCache = [];
+    let editingRowId = null;
 
     const categories = ['Выручка','Расход','Перевод','Зарплата','Налоги','Тест'];
 
-    // форматтеры
     const fmtDate = (iso) => {
       if (!iso) return '';
       const d = new Date(iso);
@@ -171,7 +170,6 @@
         tr.dataset.id = p.id;
 
         if (editingRowId === p.id) {
-          // режим редактирования — инлайновые поля в ячейках
           tr.innerHTML = `
             <td>${p.id}</td>
             <td><input type="date" value="${toInputDate(p.date)}" data-field="date" /></td>
@@ -189,7 +187,6 @@
             </td>
           `;
         } else {
-          // обычный режим
           tr.innerHTML = `
             <td>${p.id}</td>
             <td>${fmtDate(p.date)}</td>
@@ -199,6 +196,7 @@
             <td class="actions">
               <button data-edit="${p.id}">Редактировать</button>
               <button data-del="${p.id}">Удалить</button>
+              <button data-bx="${p.id}">Битрикс</button>
             </td>
           `;
         }
@@ -206,33 +204,22 @@
         tbody.appendChild(tr);
       }
 
-      // делегирование событий
       tbody.onclick = async (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
 
-        const id = Number(btn.dataset.edit || btn.dataset.del || btn.dataset.save || btn.dataset.cancel);
+        const id = Number(btn.dataset.edit || btn.dataset.del || btn.dataset.save || btn.dataset.cancel || btn.dataset.bx);
         if (!id) return;
 
-        if (btn.hasAttribute('data-edit')) {
-          editingRowId = id;
-          renderPayments();
-          return;
-        }
-        if (btn.hasAttribute('data-cancel')) {
-          editingRowId = null;
-          renderPayments();
-          return;
-        }
+        if (btn.hasAttribute('data-edit')) { editingRowId = id; renderPayments(); return; }
+        if (btn.hasAttribute('data-cancel')) { editingRowId = null; renderPayments(); return; }
         if (btn.hasAttribute('data-del')) {
           if (!confirm(`Удалить платёж #${id}?`)) return;
           await deletePayment(id, btn.closest('tr'));
           return;
         }
-        if (btn.hasAttribute('data-save')) {
-          await saveEditedRow(id, btn.closest('tr'));
-          return;
-        }
+        if (btn.hasAttribute('data-save')) { await saveEditedRow(id, btn.closest('tr')); return; }
+        if (btn.hasAttribute('data-bx'))  { await linkBitrix(id); return; }
       };
     }
 
@@ -277,7 +264,30 @@
       }
     }
 
-    // добавление нового платежа (верхняя форма)
+    async function linkBitrix(id) {
+      try {
+        const dealId = prompt('Укажи ID сделки в Битрикс (число):', '');
+        if (!dealId) return;
+        const dealNum = Number(dealId);
+        if (!Number.isFinite(dealNum)) throw new Error('ID сделки должен быть числом');
+
+        show(el('loading'), true);
+        set(el('error'), '');
+        await getJSON(`/payments/${id}/link/bitrix`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deal_id: dealNum })
+        });
+        await loadAll();
+        alert('Данные из Битрикс подтянуты ✅');
+      } catch (e) {
+        set(el('error'), e.message || 'Ошибка связи с Битрикс');
+      } finally {
+        show(el('loading'), false);
+      }
+    }
+
+    // добавление нового платежа
     el('btnAdd').addEventListener('click', async () => {
       show(el('loading'), true);
       set(el('error'), '');
