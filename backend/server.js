@@ -13,10 +13,30 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Инициализация БД
 init()
   .then(() => console.log('DB init OK'))
   .catch((err) => { console.error('DB init error:', err); process.exit(1); });
 
+// ---------- Диагностика ----------
+app.get('/health', (req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
+});
+
+app.get('/dbcheck', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT 1 as ok');
+    res.json({ db: 'ok', result: r.rows[0] });
+  } catch (e) {
+    res.status(500).json({ db: 'fail', error: e.message });
+  }
+});
+
+app.get('/version', (req, res) => {
+  res.json({ version: process.env.APP_VERSION || '0.1.0' });
+});
+
+// ---------- Основные маршруты ----------
 const SELECT_FIELDS = `
   id, date, amount::float8 AS amount, category, project, contractor,
   operation_type, article, cashbox, comment,
