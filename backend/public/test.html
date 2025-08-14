@@ -6,7 +6,7 @@
   <title>fin-uchet — проверка фронта</title>
   <style>
     body { font-family: system-ui, Arial, sans-serif; max-width: 1200px; margin: 24px auto; }
-    h1 { margin: 0 0 16px; }
+    h1 { margin: 0 0 4px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .card { border: 1px solid #e5e5e5; border-radius: 10px; padding: 14px; }
     pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
@@ -25,6 +25,7 @@
     .danger { background:#ffefef; }
     .actions { display: flex; gap: 6px; }
     .muted { color:#777; }
+    #ver { margin-left: 8px; }
 
     /* Сумма: цвет и знак */
     .amount { font-weight: 700; white-space: nowrap; }
@@ -39,7 +40,7 @@
   </style>
 </head>
 <body>
-  <h1>fin-uchet — проверка фронта</h1>
+  <h1>fin-uchet — проверка фронта <small id="ver" class="muted">UI v15</small></h1>
 
   <div class="grid">
     <div class="card">
@@ -146,9 +147,11 @@
       return n.toISOString().slice(0, 10);
     };
     const toYMD = (s) => String(s || '').slice(0,10);
+
+    // Будущее — строго больше сегодняшней даты (сравниваем YYYY-MM-DD)
     const isFuture = (iso) => toYMD(iso) > todayYMD();
 
-    // Тип операции по категории (без учёта будущего)
+    // Тип операции по категории
     const kind = (p) => {
       const c = String(p.category || '').toLowerCase();
       if (c.includes('расход')) return 'expense';
@@ -158,6 +161,7 @@
     const signFor = (k) => k === 'expense' ? '− ' : k === 'income' ? '+ ' : '';
     const classFor = (k) => k === 'income' ? 'income' : k === 'expense' ? 'expense' : '';
 
+    // Контрагент: контакт ИЛИ компания
     const counterparty = (p) => {
       const name = (p.contact_name && p.contact_name.trim()) ? p.contact_name
                   : (p.company_name && p.company_name.trim()) ? p.company_name
@@ -339,6 +343,7 @@
       }
     }
 
+    // Добавление нового платежа
     el('btnAdd').addEventListener('click', async () => {
       show(el('loading'), true);
       set(el('error'), '');
@@ -373,4 +378,3 @@
   </script>
 </body>
 </html>
-
