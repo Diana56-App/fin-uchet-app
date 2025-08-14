@@ -21,6 +21,7 @@
     button.primary { background: #111; color: #fff; border-color: #111; }
     small.muted { color: #888; }
     .hint { font-size: 12px; color: #666; margin-top: -6px; }
+    .danger { background:#ffefef; }
   </style>
 </head>
 <body>
@@ -86,10 +87,11 @@
           <th>Сумма</th>
           <th>Категория</th>
           <th>Комментарий</th>
+          <th>Действия</th>
         </tr>
       </thead>
       <tbody id="rows">
-        <tr><td colspan="5" style="text-align:center; color:#777;">Пусто</td></tr>
+        <tr><td colspan="6" style="text-align:center; color:#777;">Пусто</td></tr>
       </tbody>
     </table>
   </div>
@@ -144,19 +146,47 @@
       const tbody = el('rows');
       tbody.innerHTML = '';
       if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#777;">Платежей нет</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#777;">Платежей нет</td></tr>';
         return;
       }
       for (const p of items) {
         const tr = document.createElement('tr');
+        tr.dataset.id = p.id;
         tr.innerHTML = `
           <td>${p.id ?? ''}</td>
           <td>${fmtDate(p.date)}</td>
           <td>${fmtMoney(p.amount)}</td>
           <td>${p.category ?? ''}</td>
           <td>${p.comment ?? ''}</td>
+          <td>
+            <button data-del="${p.id}">Удалить</button>
+          </td>
         `;
         tbody.appendChild(tr);
+      }
+      // навесим обработчики удаления
+      tbody.querySelectorAll('button[data-del]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.getAttribute('data-del'));
+          if (!id) return;
+          if (!confirm(`Удалить платёж #${id}?`)) return;
+          await deletePayment(id, btn.closest('tr'));
+        });
+      });
+    }
+
+    async function deletePayment(id, row) {
+      try {
+        row?.classList.add('danger');
+        const r = await fetch(`/payments/${id}`, { method: 'DELETE' });
+        if (r.status !== 204) {
+          const text = await r.text();
+          throw new Error(`API ${r.status}: ${text}`);
+        }
+        await loadAll();
+      } catch (e) {
+        set(el('error'), e.message || 'Ошибка удаления');
+        row?.classList.remove('danger');
       }
     }
 
@@ -185,7 +215,7 @@
           body: JSON.stringify({ date, amount, category, comment })
         });
 
-        // очистим только комментарий и сумму, дату и категорию оставим
+        // очистим сумму и комментарий, дату и категорию оставим
         el('inAmount').value = '';
         el('inComment').value = '';
 
