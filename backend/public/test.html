@@ -3,22 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>fin-uchet — тест API</title>
+  <title>fin-uchet — проверка фронта</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; max-width: 960px; margin: 24px auto; }
+    body { font-family: system-ui, Arial, sans-serif; max-width: 980px; margin: 24px auto; }
     h1 { margin: 0 0 16px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px; }
+    .card { border: 1px solid #e5e5e5; border-radius: 10px; padding: 14px; }
     pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 10px; text-align: left; }
     th { background: #f8f8f8; }
-    .controls { margin: 16px 0; }
+    .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .controls { margin: 16px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .error { color: crimson; margin-top: 8px; }
+    input, select, textarea, button { padding: 10px 12px; border: 1px solid #dcdcdc; border-radius: 8px; font: inherit; }
+    button { cursor: pointer; }
+    button.primary { background: #111; color: #fff; border-color: #111; }
+    small.muted { color: #888; }
+    .hint { font-size: 12px; color: #666; margin-top: -6px; }
   </style>
 </head>
 <body>
   <h1>fin-uchet — проверка фронта</h1>
+
   <div class="grid">
     <div class="card">
       <h3>Health</h3>
@@ -32,9 +39,41 @@
 
   <div class="controls">
     <button id="btnReload">Обновить</button>
-    <button id="btnAdd">Добавить тестовый платёж</button>
-    <span id="loading" style="margin-left:10px; display:none;">Загрузка…</span>
+    <span id="loading" style="display:none;">Загрузка…</span>
     <div id="error" class="error"></div>
+  </div>
+
+  <div class="card" style="margin:16px 0;">
+    <h3 style="margin-top:0;">Добавить платёж</h3>
+    <div class="row" style="margin-bottom:10px;">
+      <div>
+        <label>Дата</label><br />
+        <input id="inDate" type="date" />
+        <div class="hint">Если пусто — возьмём сегодня</div>
+      </div>
+      <div>
+        <label>Сумма</label><br />
+        <input id="inAmount" type="number" step="0.01" inputmode="decimal" placeholder="0.00" />
+      </div>
+      <div>
+        <label>Категория</label><br />
+        <select id="inCategory">
+          <option value="">— выбрать —</option>
+          <option>Выручка</option>
+          <option>Расход</option>
+          <option>Перевод</option>
+          <option>Зарплата</option>
+          <option>Налоги</option>
+          <option>Тест</option>
+        </select>
+      </div>
+      <div>
+        <label>Комментарий</label><br />
+        <input id="inComment" type="text" placeholder="необязательно" />
+      </div>
+    </div>
+    <button id="btnAdd" class="primary">Сохранить платёж</button>
+    <small class="muted">Обязательные поля: дата, сумма, категория</small>
   </div>
 
   <h3>Payments</h3>
@@ -55,98 +94,112 @@
     </table>
   </div>
 
- <script>
-  const el = (id) => document.getElementById(id);
-  const show = (n, v) => n.style.display = v ? '' : 'none';
-  const set = (n, v) => n.textContent = v;
+  <script>
+    const el = (id) => document.getElementById(id);
+    const show = (n, v) => n.style.display = v ? '' : 'none';
+    const set = (n, v) => n.textContent = v;
 
-  // Форматтеры
-  const fmtDate = (iso) => {
-    if (!iso) return '';
-    // iso может быть '2025-08-20T00:00:00.000Z' или '2025-08-20'
-    const d = new Date(iso);
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('ru-RU');
-  };
-  const fmtMoney = (v) => {
-    if (v === null || v === undefined || v === '') return '';
-    const n = Number(v);
-    return isNaN(n)
-      ? String(v)
-      : n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+    // Форматтеры
+    const fmtDate = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? iso : d.toLocaleDateString('ru-RU');
+    };
+    const fmtMoney = (v) => {
+      if (v === null || v === undefined || v === '') return '';
+      const n = Number(v);
+      return isNaN(n)
+        ? String(v)
+        : n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
 
-  async function getJSON(path, options) {
-    const r = await fetch(path, options);
-    if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`);
-    const ct = r.headers.get('content-type') || '';
-    return ct.includes('application/json') ? r.json() : r.text();
-  }
-
-  async function loadAll() {
-    show(el('loading'), true);
-    set(el('error'), '');
-    try {
-      const [h, d, p] = await Promise.all([
-        getJSON('/health'),
-        getJSON('/dbcheck'),
-        getJSON('/payments'),
-      ]);
-      set(el('health'), JSON.stringify(h));
-      set(el('db'), JSON.stringify(d));
-      renderPayments(Array.isArray(p) ? p : []);
-    } catch (e) {
-      set(el('error'), e.message || 'Ошибка загрузки');
-    } finally {
-      show(el('loading'), false);
+    async function getJSON(path, options) {
+      const r = await fetch(path, options);
+      if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`);
+      const ct = r.headers.get('content-type') || '';
+      return ct.includes('application/json') ? r.json() : r.text();
     }
-  }
 
-  function renderPayments(items) {
-    const tbody = el('rows');
-    tbody.innerHTML = '';
-    if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#777;">Платежей нет</td></tr>';
-      return;
+    async function loadAll() {
+      show(el('loading'), true);
+      set(el('error'), '');
+      try {
+        const [h, d, p] = await Promise.all([
+          getJSON('/health'),
+          getJSON('/dbcheck'),
+          getJSON('/payments'),
+        ]);
+        set(el('health'), JSON.stringify(h));
+        set(el('db'), JSON.stringify(d));
+        renderPayments(Array.isArray(p) ? p : []);
+        prefillDate();
+      } catch (e) {
+        set(el('error'), e.message || 'Ошибка загрузки');
+      } finally {
+        show(el('loading'), false);
+      }
     }
-    for (const p of items) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${p.id ?? ''}</td>
-        <td>${fmtDate(p.date)}</td>
-        <td>${fmtMoney(p.amount)}</td>
-        <td>${p.category ?? ''}</td>
-        <td>${p.comment ?? ''}</td>
-      `;
-      tbody.appendChild(tr);
-    }
-  }
 
-  async function addDemo() {
-    show(el('loading'), true);
-    set(el('error'), '');
-    try {
+    function renderPayments(items) {
+      const tbody = el('rows');
+      tbody.innerHTML = '';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#777;">Платежей нет</td></tr>';
+        return;
+      }
+      for (const p of items) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id ?? ''}</td>
+          <td>${fmtDate(p.date)}</td>
+          <td>${fmtMoney(p.amount)}</td>
+          <td>${p.category ?? ''}</td>
+          <td>${p.comment ?? ''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function prefillDate() {
       const today = new Date().toISOString().slice(0,10);
-      await getJSON('/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: today,
-          amount: 123.45,
-          category: 'Тест',
-          comment: 'Добавлено с test.html'
-        })
-      });
-      await loadAll();
-    } catch (e) {
-      set(el('error'), e.message || 'Ошибка добавления');
-    } finally {
-      show(el('loading'), false);
+      if (!el('inDate').value) el('inDate').value = today;
     }
-  }
 
-  el('btnReload').addEventListener('click', loadAll);
-  el('btnAdd').addEventListener('click', addDemo);
-  loadAll();
-</script>
+    async function addPayment() {
+      show(el('loading'), true);
+      set(el('error'), '');
+      try {
+        const date = el('inDate').value || new Date().toISOString().slice(0,10);
+        const amountRaw = el('inAmount').value.replace(',', '.').trim();
+        const amount = Number(amountRaw);
+        const category = el('inCategory').value.trim();
+        const comment = el('inComment').value.trim() || null;
+
+        if (!date || !amountRaw || isNaN(amount) || !category) {
+          throw new Error('Заполните: дату, сумму (число) и категорию');
+        }
+
+        await getJSON('/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date, amount, category, comment })
+        });
+
+        // очистим только комментарий и сумму, дату и категорию оставим
+        el('inAmount').value = '';
+        el('inComment').value = '';
+
+        await loadAll();
+      } catch (e) {
+        set(el('error'), e.message || 'Ошибка добавления');
+      } finally {
+        show(el('loading'), false);
+      }
+    }
+
+    el('btnReload').addEventListener('click', loadAll);
+    el('btnAdd').addEventListener('click', addPayment);
+    loadAll();
+  </script>
 </body>
 </html>
