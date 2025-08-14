@@ -106,7 +106,7 @@
     const show = (n, v) => n.style.display = v ? '' : 'none';
     const set = (n, v) => n.textContent = v;
 
-    let editingId = null; // если не null — редактируем этот id
+    let editingId = null;
 
     // Форматтеры
     const fmtDate = (iso) => {
@@ -170,6 +170,12 @@
       for (const p of items) {
         const tr = document.createElement('tr');
         tr.dataset.id = p.id;
+        // сохраняем «сырые» данные в data-атрибутах (без форматирования)
+        tr.dataset.date = toInputDate(p.date);
+        tr.dataset.amount = String(p.amount ?? '');
+        tr.dataset.category = p.category ?? '';
+        tr.dataset.comment = p.comment ?? '';
+
         tr.innerHTML = `
           <td>${p.id ?? ''}</td>
           <td>${fmtDate(p.date)}</td>
@@ -184,29 +190,28 @@
         tbody.appendChild(tr);
       }
 
-      // ВАЖНО: делегирование — один обработчик на tbody
+      // Делегирование — один обработчик на tbody
       tbody.onclick = async (e) => {
         const btn = e.target.closest('button[data-edit], button[data-del]');
         if (!btn) return;
         const id = Number(btn.dataset.edit || btn.dataset.del);
         if (!id) return;
 
+        const row = btn.closest('tr');
+
         if (btn.hasAttribute('data-del')) {
           if (!confirm(`Удалить платёж #${id}?`)) return;
-          await deletePayment(id, btn.closest('tr'));
+          await deletePayment(id, row);
           return;
         }
 
-        // Редактирование
-        const row = [...tbody.querySelectorAll('tr')].find(tr => Number(tr.dataset.id) === id);
-        // найдём объект p по ячейкам (или можно запросить весь список заново)
-        const cells = row.querySelectorAll('td');
+        // Редактирование — берём исходные значения прямо из data-атрибутов
         const p = {
           id,
-          date: toInputDate(cells[1]?.textContent?.trim() ? new Date(cells[1].textContent.trim().split('.').reverse().join('-')).toISOString() : ''),
-          amount: cells[2]?.textContent?.trim().replace(/\s/g,'').replace(',','.') || '',
-          category: cells[3]?.textContent?.trim() || '',
-          comment: cells[4]?.textContent?.trim() || ''
+          date: row.dataset.date || '',
+          amount: row.dataset.amount || '',
+          category: row.dataset.category || '',
+          comment: row.dataset.comment || ''
         };
         startEdit(id, p);
       };
@@ -215,7 +220,8 @@
     function startEdit(id, p) {
       editingId = id;
       el('inDate').value = toInputDate(p?.date);
-      el('inAmount').value = (p?.amount ?? '').toString().replace('.', ',');
+      // для type=number оставляем точку как разделитель
+      el('inAmount').value = String(p?.amount ?? '');
       ensureCategoryOption(p?.category);
       el('inCategory').value = p?.category ?? '';
       el('inComment').value = p?.comment ?? '';
