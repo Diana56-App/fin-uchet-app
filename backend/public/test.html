@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>fin-uchet — тест API</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 960px; margin: 24px auto; }
+    h1 { margin: 0 0 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px; }
+    pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 10px; text-align: left; }
+    th { background: #f8f8f8; }
+    .controls { margin: 16px 0; }
+    .error { color: crimson; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>fin-uchet — проверка фронта</h1>
+  <div class="grid">
+    <div class="card">
+      <h3>Health</h3>
+      <pre id="health">—</pre>
+    </div>
+    <div class="card">
+      <h3>DB</h3>
+      <pre id="db">—</pre>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btnReload">Обновить</button>
+    <button id="btnAdd">Добавить тестовый платёж</button>
+    <span id="loading" style="margin-left:10px; display:none;">Загрузка…</span>
+    <div id="error" class="error"></div>
+  </div>
+
+  <h3>Payments</h3>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Дата</th>
+          <th>Сумма</th>
+          <th>Категория</th>
+          <th>Комментарий</th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td colspan="5" style="text-align:center; color:#777;">Пусто</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const el = (id) => document.getElementById(id);
+    const show = (n, v) => n.style.display = v ? '' : 'none';
+    const set = (n, v) => n.textContent = v;
+
+    async function getJSON(path, options) {
+      const r = await fetch(path, options);
+      if (!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`);
+      const ct = r.headers.get('content-type') || '';
+      return ct.includes('application/json') ? r.json() : r.text();
+    }
+
+    async function loadAll() {
+      show(el('loading'), true);
+      set(el('error'), '');
+      try {
+        const [h, d, p] = await Promise.all([
+          getJSON('/health'),
+          getJSON('/dbcheck'),
+          getJSON('/payments'),
+        ]);
+        set(el('health'), JSON.stringify(h));
+        set(el('db'), JSON.stringify(d));
+        renderPayments(Array.isArray(p) ? p : []);
+      } catch (e) {
+        set(el('error'), e.message || 'Ошибка загрузки');
+      } finally {
+        show(el('loading'), false);
+      }
+    }
+
+    function renderPayments(items) {
+      const tbody = el('rows');
+      tbody.innerHTML = '';
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#777;">Платежей нет</td></tr>';
+        return;
+      }
+      for (const p of items) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id ?? ''}</td>
+          <td>${p.date ?? ''}</td>
+          <td>${p.amount ?? ''}</td>
+          <td>${p.category ?? ''}</td>
+          <td>${p.comment ?? ''}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function addDemo() {
+      show(el('loading'), true);
+      set(el('error'), '');
+      try {
+        const today = new Date().toISOString().slice(0,10);
+        await getJSON('/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: today,
+            amount: 123.45,
+            category: 'Тест',
+            comment: 'Добавлено с test.html'
+          })
+        });
+        await loadAll();
+      } catch (e) {
+        set(el('error'), e.message || 'Ошибка добавления');
+      } finally {
+        show(el('loading'), false);
+      }
+    }
+
+    el('btnReload').addEventListener('click', loadAll);
+    el('btnAdd').addEventListener('click', addDemo);
+    loadAll();
+  </script>
+</body>
+</html>
