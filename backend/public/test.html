@@ -19,9 +19,11 @@
     input, select, textarea, button { padding: 10px 12px; border: 1px solid #dcdcdc; border-radius: 8px; font: inherit; }
     button { cursor: pointer; }
     button.primary { background: #111; color: #fff; border-color: #111; }
+    button.ghost { background: #fff; color: #111; }
     small.muted { color: #888; }
     .hint { font-size: 12px; color: #666; margin-top: -6px; }
     .danger { background:#ffefef; }
+    .actions { display: flex; gap: 6px; }
   </style>
 </head>
 <body>
@@ -45,7 +47,7 @@
   </div>
 
   <div class="card" style="margin:16px 0;">
-    <h3 style="margin-top:0;">Добавить платёж</h3>
+    <h3 style="margin-top:0;">Платёж</h3>
     <div class="row" style="margin-bottom:10px;">
       <div>
         <label>Дата</label><br />
@@ -73,8 +75,11 @@
         <input id="inComment" type="text" placeholder="необязательно" />
       </div>
     </div>
-    <button id="btnAdd" class="primary">Сохранить платёж</button>
-    <small class="muted">Обязательные поля: дата, сумма, категория</small>
+    <div class="controls">
+      <button id="btnAdd" class="primary">Сохранить платёж</button>
+      <button id="btnCancel" class="ghost" style="display:none;">Отменить редактирование</button>
+      <small class="muted">Обязательные поля: дата, сумма, категория</small>
+    </div>
   </div>
 
   <h3>Payments</h3>
@@ -101,6 +106,8 @@
     const show = (n, v) => n.style.display = v ? '' : 'none';
     const set = (n, v) => n.textContent = v;
 
+    let editingId = null; // если не null — редактируем этот id
+
     // Форматтеры
     const fmtDate = (iso) => {
       if (!iso) return '';
@@ -113,6 +120,11 @@
       return isNaN(n)
         ? String(v)
         : n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+    const toInputDate = (iso) => {
+      if (!iso) return '';
+      // ждём 'YYYY-MM-DD' или ISO
+      return String(iso).slice(0,10);
     };
 
     async function getJSON(path, options) {
@@ -134,12 +146,22 @@
         set(el('health'), JSON.stringify(h));
         set(el('db'), JSON.stringify(d));
         renderPayments(Array.isArray(p) ? p : []);
-        prefillDate();
+        if (!editingId) prefillDate();
       } catch (e) {
         set(el('error'), e.message || 'Ошибка загрузки');
       } finally {
         show(el('loading'), false);
       }
+    }
+
+    function ensureCategoryOption(value) {
+      const sel = el('inCategory');
+      if (!value) return;
+      if ([...sel.options].some(o => o.value === value)) return;
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = value;
+      sel.appendChild(opt);
     }
 
     function renderPayments(items) {
@@ -158,13 +180,14 @@
           <td>${fmtMoney(p.amount)}</td>
           <td>${p.category ?? ''}</td>
           <td>${p.comment ?? ''}</td>
-          <td>
+          <td class="actions">
+            <button data-edit="${p.id}">Редактировать</button>
             <button data-del="${p.id}">Удалить</button>
           </td>
         `;
         tbody.appendChild(tr);
       }
-      // навесим обработчики удаления
+      // обработчики
       tbody.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = Number(btn.getAttribute('data-del'));
@@ -173,6 +196,37 @@
           await deletePayment(id, btn.closest('tr'));
         });
       });
+      tbody.querySelectorAll('button[data-edit]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.getAttribute('data-edit'));
+          if (!id) return;
+          startEdit(id, items.find(x => x.id === id));
+        });
+      });
+    }
+
+    function startEdit(id, p) {
+      editingId = id;
+      // подставляем значения в форму
+      el('inDate').value = toInputDate(p?.date);
+      el('inAmount').value = (p?.amount ?? '').toString().replace('.', ',');
+      ensureCategoryOption(p?.category);
+      el('inCategory').value = p?.category ?? '';
+      el('inComment').value = p?.comment ?? '';
+      // меняем кнопки
+      el('btnAdd').textContent = 'Обновить платёж';
+      show(el('btnCancel'), true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+      editingId = null;
+      el('btnAdd').textContent = 'Сохранить платёж';
+      show(el('btnCancel'), false);
+      // чистим сумму и комментарий; дату и категорию можно оставить
+      el('inAmount').value = '';
+      el('inComment').value = '';
+      prefillDate();
     }
 
     async function deletePayment(id, row) {
@@ -183,6 +237,7 @@
           const text = await r.text();
           throw new Error(`API ${r.status}: ${text}`);
         }
+        if (editingId === id) cancelEdit();
         await loadAll();
       } catch (e) {
         set(el('error'), e.message || 'Ошибка удаления');
@@ -195,7 +250,7 @@
       if (!el('inDate').value) el('inDate').value = today;
     }
 
-    async function addPayment() {
+    async function addOrUpdatePayment() {
       show(el('loading'), true);
       set(el('error'), '');
       try {
@@ -209,26 +264,37 @@
           throw new Error('Заполните: дату, сумму (число) и категорию');
         }
 
-        await getJSON('/payments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date, amount, category, comment })
-        });
-
-        // очистим сумму и комментарий, дату и категорию оставим
-        el('inAmount').value = '';
-        el('inComment').value = '';
+        if (editingId) {
+          // PUT /payments/:id
+          await getJSON(`/payments/${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, amount, category, comment })
+          });
+          cancelEdit();
+        } else {
+          // POST /payments
+          await getJSON('/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, amount, category, comment })
+          });
+          // очищаем сумму и комментарий
+          el('inAmount').value = '';
+          el('inComment').value = '';
+        }
 
         await loadAll();
       } catch (e) {
-        set(el('error'), e.message || 'Ошибка добавления');
+        set(el('error'), e.message || 'Ошибка сохранения');
       } finally {
         show(el('loading'), false);
       }
     }
 
     el('btnReload').addEventListener('click', loadAll);
-    el('btnAdd').addEventListener('click', addPayment);
+    el('btnAdd').addEventListener('click', addOrUpdatePayment);
+    el('btnCancel').addEventListener('click', cancelEdit);
     loadAll();
   </script>
 </body>
