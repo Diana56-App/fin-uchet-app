@@ -35,12 +35,15 @@
     /* Бейдж «План» для будущих операций */
     .tag { display:inline-block; font-size: 12px; padding: 2px 8px; border: 1px solid #e5e5e5; border-radius: 999px; margin-left: 8px; color:#555; background:#fafafa; }
 
-    /* Лёгкая подсветка будущих строк */
-    tr.future td { background: #f6f8ff; }
+    /* Подсветка будущих строк: зелёный/розовый. Сумма — чёрная. */
+    tr.future-income td { background: #ecfdf5; }  /* очень светло-зелёный */
+    tr.future-expense td { background: #fff5f5; } /* очень светло-розовый */
+    tr.future-income .amount,
+    tr.future-expense .amount { color: #111 !important; } /* суммы чёрные */
   </style>
 </head>
 <body>
-  <h1>fin-uchet — проверка фронта <small id="ver" class="muted">UI v15</small></h1>
+  <h1>fin-uchet — проверка фронта <small id="ver" class="muted">UI v16</small></h1>
 
   <div class="grid">
     <div class="card">
@@ -217,7 +220,9 @@
         const isPlan = isFuture(p.date);
         const tr = document.createElement('tr');
         tr.dataset.id = p.id;
-        if (isPlan) tr.classList.add('future');
+        if (isPlan) {
+          tr.classList.add(k === 'expense' ? 'future-expense' : k === 'income' ? 'future-income' : 'future');
+        }
 
         if (editingRowId === p.id) {
           tr.innerHTML = `
