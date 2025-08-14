@@ -13,30 +13,31 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Инициализация БД
+// ---- DB init
 init()
   .then(() => console.log('DB init OK'))
   .catch((err) => { console.error('DB init error:', err); process.exit(1); });
 
-// ---------- Диагностика ----------
-app.get('/health', (req, res) => {
+// ---- Diagnostics
+app.get('/health', (_req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
 });
 
-app.get('/dbcheck', async (req, res) => {
+app.get('/dbcheck', async (_req, res) => {
   try {
-    const r = await pool.query('SELECT 1 as ok');
-    res.json({ db: 'ok', result: r.rows[0] });
+    const { rows } = await pool.query('SELECT 1 AS ok');
+    res.json({ db: 'ok', result: rows[0] });
   } catch (e) {
-    res.status(500).json({ db: 'fail', error: e.message });
+    console.error('/dbcheck error:', e);
+    res.status(500).json({ db: 'error' });
   }
 });
 
-app.get('/version', (req, res) => {
-  res.json({ version: process.env.APP_VERSION || '0.1.0' });
+app.get('/version', (_req, res) => {
+  res.json({ version: '0.1.0' });
 });
 
-// ---------- Основные маршруты ----------
+// ---- Common fields
 const SELECT_FIELDS = `
   id, date, amount::float8 AS amount, category, project, contractor,
   operation_type, article, cashbox, comment,
@@ -45,7 +46,7 @@ const SELECT_FIELDS = `
 `;
 
 // ---------------- GET ----------------
-app.get('/payments', async (req, res) => {
+app.get('/payments', async (_req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT ${SELECT_FIELDS} FROM payments ORDER BY date DESC, id DESC`
@@ -102,16 +103,14 @@ app.put('/payments/:id', async (req, res) => {
       return res.status(400).json({ error: 'date, amount, category — обязательны' });
     }
 
-    // Читаем текущую запись
+    // Текущая запись
     const curQ = await pool.query(`SELECT ${SELECT_FIELDS} FROM payments WHERE id=$1`, [id]);
     const cur = curQ.rows[0];
     if (!cur) return res.status(404).json({ error: 'Not found' });
 
-    // Хелпер: если значение не задано (null/undefined/''), оставляем текущее
     const keep = (val, existing) =>
       (val === undefined || val === null || val === '') ? existing : val;
 
-    // Собираем окончательные значения
     const final = {
       date:           p.date,
       amount:         p.amount,
@@ -123,7 +122,6 @@ app.put('/payments/:id', async (req, res) => {
       cashbox:        p.cashbox ?? null,
       comment:        p.comment ?? null,
 
-      // Битрикс-поля — берём из тела, а если там пусто, то из текущей строки
       deal_id:        keep(p.deal_id,        cur.deal_id),
       contact_id:     keep(p.contact_id,     cur.contact_id),
       company_id:     keep(p.company_id,     cur.company_id),
@@ -207,7 +205,7 @@ app.patch('/payments/:id/link', async (req, res) => {
   }
 });
 
-// ---------------- POST: автоподтяжка из Bitrix ----------------
+// ---------------- POST: автоподтяжка из Bitrix (с необязательной синхронизацией суммы) ----------------
 app.post('/payments/:id/link/bitrix', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -218,8 +216,14 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
     const current = curQ.rows[0];
     if (!current) return res.status(404).json({ error: 'Not found' });
 
-    let { deal_id = current.deal_id, contact_id = current.contact_id,
-          company_id = current.company_id, project_id = current.project_id } = req.body || {};
+    let {
+      deal_id = current.deal_id,
+      contact_id = current.contact_id,
+      company_id = current.company_id,
+      project_id = current.project_id,
+      sync_amount = false,
+    } = req.body || {};
+    sync_amount = Boolean(sync_amount);
 
     const patch = {};
 
@@ -227,6 +231,15 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
       const deal = await bitrix.getDeal(deal_id);
       patch.deal_id = Number(deal_id);
       patch.deal_name = deal.TITLE || null;
+
+      // по желанию подтягиваем сумму из сделки
+      if (sync_amount) {
+        const raw = deal.OPPORTUNITY ?? deal.OPPORTUNITY_ACCOUNT ?? deal.AMOUNT ?? null;
+        if (raw !== null && raw !== undefined && raw !== '') {
+          const num = Number(String(raw).replace(/\s/g, '').replace(',', '.'));
+          if (Number.isFinite(num)) patch.amount = num;
+        }
+      }
 
       if (!contact_id && deal.CONTACT_ID) contact_id = Number(deal.CONTACT_ID);
       if (!company_id && deal.COMPANY_ID) company_id = Number(deal.COMPANY_ID);

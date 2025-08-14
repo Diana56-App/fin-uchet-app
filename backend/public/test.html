@@ -325,6 +325,7 @@
       }
     }
 
+    // === Битрикс: спрашиваем, подтягивать ли сумму из сделки ===
     async function linkBitrix(id) {
       try {
         const dealId = prompt('Укажи ID сделки в Битрикс (число):', '');
@@ -332,15 +333,17 @@
         const dealNum = Number(dealId);
         if (!Number.isFinite(dealNum)) throw new Error('ID сделки должен быть числом');
 
+        const sync = confirm('Подтянуть сумму из сделки и заменить сумму платежа?');
+
         show(el('loading'), true);
         set(el('error'), '');
         await getJSON(`/payments/${id}/link/bitrix`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deal_id: dealNum })
+          body: JSON.stringify({ deal_id: dealNum, sync_amount: sync })
         });
         await loadAll();
-        alert('Данные из Битрикс подтянуты ✅');
+        alert(sync ? 'Данные и сумма подтянуты ✅' : 'Данные подтянуты ✅');
       } catch (e) {
         set(el('error'), e.message || 'Ошибка связи с Битрикс');
       } finally {
