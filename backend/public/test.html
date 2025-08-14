@@ -26,11 +26,13 @@
     .actions { display: flex; gap: 6px; }
     .muted { color:#777; }
 
-    /* Цвета сумм */
+    /* Сумма: цвет и знак */
     .amount { font-weight: 700; white-space: nowrap; }
-    .amount.income { color: #138a36; }   /* зелёный — доход */
-    .amount.expense { color: #d32f2f; }  /* красный — расход */
-    .amount.future { color: #3f51b5; }   /* синий — будущее */
+    .amount.income { color: #138a36; }   /* доход */
+    .amount.expense { color: #d32f2f; }  /* расход */
+
+    /* Бейдж «План» для будущих операций */
+    .tag { display:inline-block; font-size: 12px; padding: 2px 8px; border: 1px solid #e5e5e5; border-radius: 999px; margin-left: 8px; color:#555; background:#fafafa; }
 
     /* Лёгкая подсветка будущих строк */
     tr.future td { background: #f6f8ff; }
@@ -107,7 +109,7 @@
         </tr>
       </thead>
       <tbody id="rows">
-        <tr><td colspan="8" style="text-align:center; color:#777;">Пусто</td></tr>
+        <tr><td colspan="8" style="text-align:center; color:#777;">Платежей нет</td></tr>
       </tbody>
     </table>
   </div>
@@ -137,22 +139,24 @@
     };
     const toInputDate = (iso) => String(iso || '').slice(0,10);
 
-    const todayYMD = () => new Date().toISOString().slice(0,10);
-    const isFuture = (iso) => {
-      if (!iso) return false;
-      const d = new Date(iso);
-      const t0 = new Date(); t0.setHours(0,0,0,0);
-      return d > t0;
+    // Таймзонобезопасное «сегодня» (YYYY-MM-DD)
+    const todayYMD = () => {
+      const n = new Date();
+      n.setMinutes(n.getMinutes() - n.getTimezoneOffset());
+      return n.toISOString().slice(0, 10);
     };
+    const toYMD = (s) => String(s || '').slice(0,10);
+    const isFuture = (iso) => toYMD(iso) > todayYMD();
+
+    // Тип операции по категории (без учёта будущего)
     const kind = (p) => {
       const c = String(p.category || '').toLowerCase();
-      if (isFuture(p.date)) return 'future';
       if (c.includes('расход')) return 'expense';
       if (c.includes('выруч')) return 'income';
       return 'other';
     };
     const signFor = (k) => k === 'expense' ? '− ' : k === 'income' ? '+ ' : '';
-    const classFor = (k) => k === 'income' ? 'income' : k === 'expense' ? 'expense' : k === 'future' ? 'future' : '';
+    const classFor = (k) => k === 'income' ? 'income' : k === 'expense' ? 'expense' : '';
 
     const counterparty = (p) => {
       const name = (p.contact_name && p.contact_name.trim()) ? p.contact_name
@@ -206,9 +210,10 @@
 
       for (const p of paymentsCache) {
         const k = kind(p);
+        const isPlan = isFuture(p.date);
         const tr = document.createElement('tr');
         tr.dataset.id = p.id;
-        if (k === 'future') tr.classList.add('future');
+        if (isPlan) tr.classList.add('future');
 
         if (editingRowId === p.id) {
           tr.innerHTML = `
@@ -233,7 +238,10 @@
           tr.innerHTML = `
             <td>${p.id}</td>
             <td>${fmtDate(p.date)}</td>
-            <td><span class="amount ${classFor(k)}">${signFor(k)}${fmtMoney(p.amount, true)}</span></td>
+            <td>
+              <span class="amount ${classFor(k)}">${signFor(k)}${fmtMoney(p.amount, true)}</span>
+              ${isPlan ? '<span class="tag">План</span>' : ''}
+            </td>
             <td>${p.category ?? ''}${p.comment ? `<div class="muted">${p.comment}</div>` : ''}</td>
             <td>${p.project_name ?? ''}</td>
             <td>${counterparty(p)}</td>
@@ -246,10 +254,10 @@
           `;
         }
 
-        el('rows').appendChild(tr);
+        tbody.appendChild(tr);
       }
 
-      el('rows').onclick = async (e) => {
+      tbody.onclick = async (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
         const id = Number(btn.dataset.edit || btn.dataset.del || btn.dataset.save || btn.dataset.cancel || btn.dataset.bx);
@@ -273,7 +281,7 @@
         const date = getVal('date') || todayYMD();
         const amount = Number(String(getVal('amount')).replace(',', '.').trim());
         const category = String(getVal('category')).trim();
-        const comment = null; // коммент редактируем через «Статья/Описание» не трогаем здесь
+        const comment = null;
 
         if (!date || !category || isNaN(amount)) {
           throw new Error('Заполните корректно дату, сумму и категорию');
@@ -331,7 +339,6 @@
       }
     }
 
-    // добавление нового платежа
     el('btnAdd').addEventListener('click', async () => {
       show(el('loading'), true);
       set(el('error'), '');
@@ -366,3 +373,4 @@
   </script>
 </body>
 </html>
+
