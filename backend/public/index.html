@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Финансы Сталкер</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    body { background:#f4f5f7; font-family:'Segoe UI',sans-serif; margin:0; }
+    .container { max-width:1000px; margin:40px auto; background:#fff; border-radius:18px; box-shadow:0 8px 36px #d0c6db42; padding:30px 30px 50px; }
+    h1 { color:#b20054; font-size:2.2em; font-weight:800; margin:10px 0 12px; }
+    .card { background:#fff; border-radius:16px; box-shadow:0 6px 30px #d0c6db22; padding:16px; }
+    .hidden { display:none; }
+
+    /* Панель над таблицей: слева — Показать/Добавить */
+    .toolbar { display:flex; align-items:center; gap:12px; margin:6px 0 12px; }
+    .spacer { flex:1; }
+
+    /* Новая панель фильтров + итоги */
+    .filters { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:8px 0 4px; }
+    .filters .spacer { flex:1; }
+    .totals { font-weight:700; }
+    .totals .pos { color:#2e9f47; }
+    .totals .neg { color:#c0392b; }
+    .totals .bal { color:#333; }
+
+    /* Поля формы (скрытая форма добавления) */
+    .form-row {
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap:12px;
+      align-items:center;
+      margin:12px 0 0;
+    }
+    .form-actions {
+      display:flex; justify-content:flex-end; gap:12px; margin-top:12px; flex-wrap:wrap;
+    }
+
+    input, select {
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid #c9c9c9;
+      font-size:14px;
+      background:#fff;
+    }
+
+    .btn { background:#b20054; color:#fff; border:none; padding:12px 18px; border-radius:10px; font-size:14px; cursor:pointer; transition:.15s; font-weight:600; }
+    .btn:hover { background:#920045; }
+    .btn-secondary { background:#eee; color:#333; }
+
+    table { width:100%; border-collapse:collapse; margin-top:12px; border-radius:14px; overflow:hidden; }
+    th,td { border-bottom:1px solid #f1f1f1; padding:12px 10px; text-align:left; font-size:15px; }
+    th { background:#fde7f3; color:#b20054; font-weight:700; }
+
+    @media (max-width: 600px) {
+      .toolbar { flex-direction:column; align-items:stretch; }
+      .toolbar .btn { width:100%; }
+      .form-actions { justify-content:stretch; }
+      .form-actions .btn { flex:1 1 auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Финансы Сталкер</h1>
+
+    <div class="card">
+      <!-- Панель действий -->
+      <div class="toolbar">
+        <button id="load" class="btn btn-secondary">Показать платежи</button>
+        <div class="spacer"></div>
+        <button id="toggleAdd" class="btn">Добавить платёж</button>
+      </div>
+
+      <!-- Новая панель фильтров + итоги -->
+      <div class="filters">
+        <select id="f_operation_type" title="Фильтр: тип операции">
+          <option value="">Все операции</option>
+          <option value="income">Только доход</option>
+          <option value="expense">Только расход</option>
+        </select>
+
+        <select id="f_cashbox" title="Фильтр: касса">
+          <option value="">Все кассы</option>
+          <option value="cash">Наличные</option>
+          <option value="card">Карта</option>
+          <option value="bank">Расчетный счет</option>
+          <option value="robokassa">Робокасса</option>
+        </select>
+
+        <button id="f_reset" class="btn btn-secondary">Сбросить фильтры</button>
+
+        <div class="spacer"></div>
+        <div id="totals" class="totals">Доход: — • Расход: — • Баланс: —</div>
+      </div>
+
+      <!-- Скрытая форма добавления -->
+      <div id="addForm" class="hidden">
+        <div class="form-row">
+          <input type="date" id="date" />
+          <input type="number" id="amount" placeholder="Сумма" min="1" />
+          <select id="operation_type" title="Тип операции">
+            <option value="" selected>Тип операции</option>
+            <option value="income">Доход</option>
+            <option value="expense">Расход</option>
+          </select>
+          <select id="cashbox" title="Касса">
+            <option value="" selected>Касса</option>
+            <option value="cash">Наличные</option>
+            <option value="card">Карта</option>
+            <option value="bank">Расчетный счет</option>
+            <option value="robokassa">Робокасса</option>
+          </select>
+          <input type="text" id="article" placeholder="Статья" />
+          <input type="text" id="project" placeholder="Проект" />
+          <input type="text" id="contractor" placeholder="Контрагент" />
+        </div>
+        <div class="form-actions">
+          <button id="save" class="btn">Сохранить</button>
+          <button id="cancel" class="btn btn-secondary">Отмена</button>
+        </div>
+      </div>
+
+      <!-- Таблица -->
+      <div id="table"></div>
+    </div>
+  </div>
+
+  <script src="payments.js"></script>
+</body>
+</html>
