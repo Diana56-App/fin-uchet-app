@@ -1,7 +1,5 @@
 // backend/server.js
-// Express-сервер: API + раздача фронта с КОРНЯ "/"
-// Вариант А реализован: фронт из backend/frontend -> "/", дублирование на "/app",
-// редиректы /install (GET/POST) и /handler (GET) -> 302 на "/". API не меняется.
+// Express-сервер: API + фронт с корня "/" + редиректы Bitrix. API не меняем.
 
 require('dotenv').config();
 
@@ -17,7 +15,7 @@ const axios = require('axios');
 
 const app = express();
 
-// --- Базовые настройки ---
+// База middlewares
 app.set('trust proxy', 1);
 app.use(compression());
 app.use(morgan('tiny'));
@@ -35,7 +33,7 @@ const pool = DATABASE_URL
     })
   : null;
 
-// --- Утилиты для БД (универсальные апдейты под неизвестную схему "payments") ---
+// Утилиты для универсальных INSERT/UPDATE
 async function getTableColumns(table) {
   const key = `__cols_${table}`;
   if (!pool) return [];
@@ -70,9 +68,8 @@ function buildUpdate(table, body, cols, idParamName = 'id', idValue) {
   return { sql, values };
 }
 
-// --- Тех. эндпоинты (как были) ---
+// Тех-маршруты
 app.get('/health', (_req, res) => res.json({ ok: true }));
-
 app.get('/dbcheck', async (_req, res) => {
   try {
     if (!pool) return res.status(500).json({ ok: false, error: 'No DATABASE_URL' });
@@ -82,16 +79,9 @@ app.get('/dbcheck', async (_req, res) => {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
+app.get('/version', (_req, res) => res.json({ version: '0.1.0' }));
 
-app.get('/version', (_req, res) => {
-  // Зафиксируем версию, как в диагностике
-  res.json({ version: '0.1.0' });
-});
-
-// --- API /payments (пути и семантика сохранены) ---
-/**
- * GET /payments — JSON список платежей
- */
+// API /payments - без изменений
 app.get('/payments', async (_req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -102,9 +92,6 @@ app.get('/payments', async (_req, res) => {
   }
 });
 
-/**
- * POST /payments — создать запись (универсально по переданным полям)
- */
 app.post('/payments', async (req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -118,9 +105,6 @@ app.post('/payments', async (req, res) => {
   }
 });
 
-/**
- * PUT /payments/:id — полная замена по id (универсально)
- */
 app.put('/payments/:id', async (req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -136,9 +120,6 @@ app.put('/payments/:id', async (req, res) => {
   }
 });
 
-/**
- * DELETE /payments/:id — удалить запись
- */
 app.delete('/payments/:id', async (req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -151,9 +132,7 @@ app.delete('/payments/:id', async (req, res) => {
   }
 });
 
-/**
- * PATCH /payments/:id/link — ручная правка битрикс-полей (универсально)
- */
+// Ручная правка битрикс-полей
 app.patch('/payments/:id/link', async (req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -169,11 +148,7 @@ app.patch('/payments/:id/link', async (req, res) => {
   }
 });
 
-/**
- * POST /payments/:id/link/bitrix — подтяжка из Bitrix
- * Ожидаем, что в body придут { dealId } или другой идентификатор,
- * либо вы используете BITRIX_* переменные окружения.
- */
+// Подтяжка из Bitrix
 app.post('/payments/:id/link/bitrix', async (req, res) => {
   const { id } = req.params;
   const { dealId } = req.body || {};
@@ -184,8 +159,6 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
       return res.status(400).json({ error: 'BITRIX_WEBHOOK_URL or dealId missing' });
     }
 
-    // Пример вызова Bitrix Webhook API (адаптируйте под свою схему)
-    // Получаем сделку и нужные поля:
     const dealResp = await axios.get(`${hook}/crm.deal.get`, {
       params: { id: dealId },
       timeout: 15000,
@@ -194,8 +167,6 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
     const deal = dealResp?.data?.result || {};
     const cols = await getTableColumns('payments');
 
-    // Маппинг: пытаемся положить поля сделки, если такие колонки есть
-    // Например, bitrix_deal_id, bitrix_title, bitrix_contact_id, и т.д.
     const patch = {};
     if (cols.includes('bitrix_deal_id')) patch.bitrix_deal_id = dealId;
     if (cols.includes('bitrix_title') && deal.TITLE) patch.bitrix_title = deal.TITLE;
@@ -217,41 +188,72 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
   }
 });
 
-// --- Раздача фронта: КОРЕНЬ "/" + дубликат на "/app" ---
+// Раздача фронта: корень "/" + дубликат "/app"
 const FRONTEND_DIR = path.join(__dirname, 'frontend');
 const INDEX_HTML = path.join(FRONTEND_DIR, 'index.html');
 
-// 1) Статика по корню "/"
-app.use(express.static(FRONTEND_DIR, { index: 'index.html', extensions: ['html'] }));
+// Статика: отключаем кэш для index.html, для остального — обычный cache-control
+app.use(express.static(FRONTEND_DIR, {
+  index: 'index.html',
+  extensions: ['html'],
+  setHeaders: (res, filePath) => {
+    if (path.basename(filePath) === 'index.html') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=300');
+    }
+  }
+}));
 
-// 2) Дублируем на "/app" (для обратной совместимости)
-app.use('/app', express.static(FRONTEND_DIR, { index: 'index.html', extensions: ['html'] }));
+app.use('/app', express.static(FRONTEND_DIR, {
+  index: 'index.html',
+  extensions: ['html'],
+  setHeaders: (res, filePath) => {
+    if (path.basename(filePath) === 'index.html') {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=300');
+    }
+  }
+}));
 
-// 3) Прямые маршруты на корень (гарантированно отдаем index.html)
+// Корень и SPA-фолбэк: тоже no-store для index.html
 app.get('/', (_req, res) => {
-  if (fs.existsSync(INDEX_HTML)) return res.sendFile(INDEX_HTML);
+  if (fs.existsSync(INDEX_HTML)) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    return res.sendFile(INDEX_HTML);
+  }
   return res.status(500).send('index.html not found in frontend/');
 });
 
-// 4) Редиректы Bitrix-маршрутов установки/хэндлера на корень
+// Редиректы Bitrix
 app.get('/install', (_req, res) => res.redirect(302, '/'));
 app.post('/install', (_req, res) => res.redirect(302, '/'));
 app.get('/handler', (_req, res) => res.redirect(302, '/'));
 
-// 5) Фолбэк для SPA-маршрутов (кроме известных API путей)
+// SPA-фолбэк кроме API
 app.get('*', (req, res, next) => {
-  const knownApi = [
-    /^\/payments(\/.*)?$/,
-    /^\/health$/,
-    /^\/dbcheck$/,
-    /^\/version$/,
-  ];
+  const knownApi = [/^\/payments(\/.*)?$/, /^\/health$/, /^\/dbcheck$/, /^\/version$/];
   if (knownApi.some(rx => rx.test(req.path))) return next();
-  if (fs.existsSync(INDEX_HTML)) return res.sendFile(INDEX_HTML);
+  if (fs.existsSync(INDEX_HTML)) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    return res.sendFile(INDEX_HTML);
+  }
   return res.status(404).send('Not found');
 });
 
-// --- Запуск ---
 app.listen(PORT, () => {
   console.log(`Server listening on ${PORT}`);
 });
