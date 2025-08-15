@@ -4,249 +4,413 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Финучёт — приложение</title>
-  <script src="https://api.bitrix24.com/api/v1/"></script>
+
+  <!-- ШАПКА/СТИЛИ -->
   <style>
-    :root { --w: 1120px; }
-    body { font-family: system-ui, Arial, sans-serif; max-width: var(--w); margin: 8px auto 24px; }
-    h1 { margin: 0 0 12px; font-size: 20px; }
-    .card { border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px; background: #fff; }
-    .controls { margin: 8px 0 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    .error { color: crimson; }
-    input, select, button { padding: 9px 11px; border: 1px solid #dcdcdc; border-radius: 8px; font: inherit; }
-    button { cursor: pointer; }
-    button.primary { background: #111; color: #fff; border-color: #111; }
-    small.muted { color:#888; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border-bottom: 1px solid #f0f0f0; padding: 8px 10px; text-align: left; vertical-align: top; }
-    th { background:#f8f8f8; }
-    .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .actions { display:flex; gap:6px; flex-wrap: wrap; }
-    .muted { color:#777; }
-    #ver { margin-left: 8px; color:#888; font-weight: normal; }
+    :root{
+      --brand:#d91a6a;           /* малиновый */
+      --brand-dark:#b51457;
+      --ink:#111;
+      --muted:#6b7280;
+      --surface:#fff;
+      --line:#ececec;
+      --ok:#128a44;
+      --bad:#d32f2f;
+      --plan-income:#ecfdf5;
+      --plan-expense:#fff5f5;
+      --radius:14px;
+      --radius-sm:10px;
+      --shadow:0 6px 24px rgba(17,17,17,.06);
+      --container:1120px;
+    }
+    *{ box-sizing:border-box }
+    html,body{ height:100% }
+    body{
+      margin:0;
+      font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--ink);
+      background:#fafafa;
+    }
 
-    .amount { font-weight:700; white-space:nowrap; }
-    .amount.income { color:#138a36; }
-    .amount.expense { color:#d32f2f; }
+    /* Градиентная шапка */
+    .hero{
+      background: linear-gradient(135deg, var(--brand) 0%, #ff4f93 100%);
+      color:#fff;
+      padding:26px 18px 22px;
+      box-shadow: var(--shadow);
+    }
+    .hero__inner{
+      max-width:var(--container);
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .hero__title{
+      margin:0;
+      font-size:28px;
+      font-weight:800;
+      letter-spacing:.3px;
+      line-height:1.1;
+    }
+    .hero__badge{
+      font-size:12px;
+      padding:4px 9px;
+      border:1px solid rgba(255,255,255,.75);
+      border-radius:999px;
+      opacity:.9;
+    }
 
-    .tag { display:inline-block; font-size:12px; padding:2px 8px; border:1px solid #e5e5e5; border-radius:999px; margin-left:8px; color:#555; background:#fafafa; }
-    tr.future-income td { background:#ecfdf5; }
-    tr.future-expense td { background:#fff5f5; }
-    tr.future-income .amount, tr.future-expense .amount { color:#111 !important; }
+    /* Контейнер и карточки */
+    .container{ max-width:var(--container); margin:18px auto; padding:0 18px; }
+    .card{
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow: var(--shadow);
+      padding:16px;
+    }
+    .grid{ display:grid; gap:14px }
+    .controls{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .muted{ color:var(--muted) }
+
+    /* Элементы форм и кнопки */
+    input, select, button{
+      font:inherit;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:#fff;
+    }
+    input:focus, select:focus{ outline:none; border-color:#cfcfcf; box-shadow:0 0 0 3px rgba(0,0,0,.04); }
+    button{ cursor:pointer }
+    .btn{
+      background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 14px;
+    }
+    .btn--primary{ background:var(--ink); color:#fff; border-color:var(--ink); }
+    .btn--danger{ background:#fff; color:var(--bad); border-color:#ffd7d7 }
+    .btn--ghost{ background:#fff }
+
+    /* Таблица */
+    table{ width:100%; border-collapse:collapse }
+    th,td{ padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; text-align:left }
+    thead th{
+      background:#fff0f6;               /* деликатный оттенок шапки */
+      color:#6b0f37;
+      font-weight:700;
+      position:sticky; top:0; z-index:1;
+    }
+
+    .amount{ font-weight:700; white-space:nowrap }
+    .amount.income{ color:var(--ok) }
+    .amount.expense{ color:var(--bad) }
+    .tag{ display:inline-block; font-size:12px; padding:2px 8px; border:1px solid var(--line); border-radius:999px; background:#fafafa; margin-left:8px; color:var(--muted) }
+
+    /* Подсветка плановых строк (будущее) */
+    tr.future-income td{ background:var(--plan-income) }
+    tr.future-expense td{ background:var(--plan-expense) }
+
+    /* Столбец действий */
+    .actions{ display:flex; gap:8px; flex-wrap:wrap }
+    .actions .btn{ padding:8px 12px }
+
+    /* Вспомогательные */
+    .section-title{ margin:0 0 10px; font-size:18px; font-weight:800 }
+    .error{ color:var(--bad) }
   </style>
 </head>
 <body>
-  <h1>Финучёт <small id="ver">APP v1</small></h1>
 
-  <div class="controls">
-    <label style="display:flex; align-items:center; gap:6px; font-size:14px;">
-      <input id="prefSync" type="checkbox" />
-      Битрикс: подтягивать сумму из сделки
-    </label>
-    <span id="loading" style="display:none;">Загрузка…</span>
-    <div id="error" class="error"></div>
-  </div>
+  <!-- ШАПКА -->
+  <header class="hero">
+    <div class="hero__inner">
+      <h1 class="hero__title">Финучёт <span class="hero__badge" title="версия интерфейса">APP v1</span></h1>
+    </div>
+  </header>
 
-  <div class="card" style="margin-bottom:12px;">
-    <h3 style="margin:0 0 8px;">Добавить платёж</h3>
-    <div class="row" style="margin-bottom:10px;">
-      <div>
-        <label>Дата</label><br />
-        <input id="inDate" type="date" />
-        <div class="muted" style="font-size:12px;margin-top:4px;">Если пусто — возьмём сегодня</div>
-      </div>
-      <div>
-        <label>Сумма</label><br />
-        <input id="inAmount" type="number" step="0.01" inputmode="decimal" placeholder="0.00" />
-      </div>
-      <div>
-        <label>Категория</label><br />
-        <select id="inCategory">
-          <option value="">— выбрать —</option>
-          <option>Выручка</option>
-          <option>Расход</option>
-          <option>Перевод</option>
-          <option>Зарплата</option>
-          <option>Налоги</option>
-          <option>Тест</option>
-        </select>
-      </div>
-      <div>
-        <label>Комментарий</label><br />
-        <input id="inComment" type="text" placeholder="необязательно" />
+  <main class="container">
+    <!-- Настройка -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="controls">
+        <label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="prefSync" />
+          <span class="muted">Битрикс: подтягивать сумму из сделки</span>
+        </label>
+        <span id="loading" class="muted" style="display:none;">Загрузка…</span>
+        <span id="error" class="error"></span>
       </div>
     </div>
-    <button id="btnAdd" class="primary">Сохранить платёж</button>
-  </div>
 
-  <div class="card" style="overflow:auto;">
-    <table>
-      <thead>
-      <tr>
-        <th>ID</th><th>Дата</th><th>Сумма</th><th>Статья/Описание</th>
-        <th>Проект</th><th>Контрагент</th><th>Счёт/Касса</th><th>Действия</th>
-      </tr>
-      </thead>
-      <tbody id="rows"><tr><td colspan="8" class="muted" style="text-align:center;">Пусто</td></tr></tbody>
-    </table>
-  </div>
+    <!-- Форма добавления -->
+    <section class="card" style="margin-bottom:14px;">
+      <h3 class="section-title">Добавить платёж</h3>
+      <div class="grid" style="grid-template-columns: repeat(4, 1fr);">
+        <div>
+          <div class="muted" style="margin-bottom:6px;">Дата</div>
+          <input id="inDate" type="date" />
+          <div class="muted" style="font-size:12px;margin-top:6px;">Если пусто — возьмём сегодня</div>
+        </div>
+        <div>
+          <div class="muted" style="margin-bottom:6px;">Сумма</div>
+          <input id="inAmount" type="number" step="0.01" inputmode="decimal" placeholder="0.00" />
+        </div>
+        <div>
+          <div class="muted" style="margin-bottom:6px;">Категория</div>
+          <select id="inCategory">
+            <option value="">— выбрать —</option>
+            <option>Выручка</option>
+            <option>Расход</option>
+            <option>Перевод</option>
+            <option>Зарплата</option>
+            <option>Налоги</option>
+            <option>Тест</option>
+          </select>
+        </div>
+        <div>
+          <div class="muted" style="margin-bottom:6px;">Комментарий</div>
+          <input id="inComment" type="text" placeholder="необязательно" />
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button id="btnAdd" class="btn btn--primary">Сохранить платёж</button>
+      </div>
+    </section>
 
+    <!-- Таблица -->
+    <section class="card" style="overflow:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Дата</th>
+            <th>Сумма</th>
+            <th>Статья/Описание</th>
+            <th>Проект</th>
+            <th>Контрагент</th>
+            <th>Счёт/Касса</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="8" class="muted" style="text-align:center;">Пусто</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- ЛОГИКА -->
   <script>
-    // --- Bitrix iFrame auto-fit
-    function bxFit(){ try{ if(window.BX24 && BX24.fitWindow) setTimeout(()=>BX24.fitWindow(), 50); }catch(_){} }
-    if (window.BX24 && BX24.init) { try{ BX24.init(bxFit); }catch(_){} }
+    // Помощники
+    const $ = (id)=>document.getElementById(id);
+    const show = (n, v)=> n.style.display = v ? '' : 'none';
+    const set = (n, v)=> n.textContent = v;
 
-    const el=id=>document.getElementById(id);
-    const show=(n,v)=>n.style.display=v?'':'none';
-    const set=(n,v)=>n.textContent=v;
-
-    let paymentsCache=[], editingRowId=null;
-    const categories=['Выручка','Расход','Перевод','Зарплата','Налоги','Тест'];
-
-    const fmtDate=iso=>{ if(!iso) return ''; const d=new Date(iso); return isNaN(d.getTime())?iso:d.toLocaleDateString('ru-RU'); };
-    const fmtMoney=(v,cc=false)=>{ if(v===null||v===undefined||v==='') return ''; const n=Number(v);
-      const s=isNaN(n)?String(v):n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}); return cc?`${s} ₽`:s; };
-    const toInputDate=iso=>String(iso||'').slice(0,10);
-    const todayYMD=()=>{ const n=new Date(); n.setMinutes(n.getMinutes()-n.getTimezoneOffset()); return n.toISOString().slice(0,10); };
-    const toYMD=s=>String(s||'').slice(0,10);
-    const isFuture=iso=>toYMD(iso)>todayYMD();
-
-    const kind=p=>{ const c=String(p.category||'').toLowerCase(); if(c.includes('расход'))return'expense'; if(c.includes('выруч'))return'income'; return'other'; };
-    const signFor=k=>k==='expense'?'− ':k==='income'?'+ ':'';
-    const classFor=k=>k==='income'?'income':k==='expense'?'expense':'';
-    const counterparty=p=>{
-      const name=(p.contact_name&&p.contact_name.trim())?p.contact_name:(p.company_name&&p.company_name.trim())?p.company_name:'';
-      if(name) return name; if(p.contact_id) return '#'+p.contact_id; if(p.company_id) return '#'+p.company_id; return '';
+    const todayYMD = ()=>{ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+    const toYMD = (v)=> String(v||'').slice(0,10);
+    const fmtDate = (iso)=>{ if(!iso) return ''; const d=new Date(iso); return isNaN(d)? String(iso) : d.toLocaleDateString('ru-RU'); };
+    const fmtMoney = (v,cc=true)=> {
+      if(v===null||v===undefined||v==='') return '';
+      const n=Number(v);
+      const s = isNaN(n) ? String(v) : n.toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+      return cc ? s + ' ₽' : s;
     };
+    const isFuture = (iso)=> toYMD(iso) > todayYMD();
 
-    // pref: sync amount from deal
-    const PREF_KEY='bx_sync_amount'; const getPrefSync=()=>localStorage.getItem(PREF_KEY)==='1'; const setPrefSync=v=>localStorage.setItem(PREF_KEY, v?'1':'0');
-    const prefBox=el('prefSync'); prefBox.checked=getPrefSync(); prefBox.addEventListener('change', ()=>setPrefSync(prefBox.checked));
+    const kind = (p)=> {
+      const c = String(p.category||'').toLowerCase();
+      if(c.includes('расход')) return 'expense';
+      if(c.includes('выруч')) return 'income';
+      return 'other';
+    };
+    const signFor = (k)=> k==='income' ? '+ ' : (k==='expense' ? '− ' : '');
 
-    async function getJSON(path,options){ const r=await fetch(path,options); if(!r.ok) throw new Error(`API ${r.status}: ${await r.text()}`); const ct=r.headers.get('content-type')||''; return ct.includes('application/json')?r.json():r.text(); }
+    const PREF_KEY='bx_sync_amount';
+    const getPrefSync = ()=> localStorage.getItem(PREF_KEY)==='1';
+    const setPrefSync = (v)=> localStorage.setItem(PREF_KEY', v?'1':'0'); // typo fix below
+  </script>
+  <script>
+    // исправление опечатки в отдельном теге (чтобы не путаться выше)
+    const setPrefSync = (v)=> localStorage.setItem('bx_sync_amount', v ? '1' : '0');
+    $('prefSync').checked = localStorage.getItem('bx_sync_amount') === '1';
+    $('prefSync').addEventListener('change', ()=> setPrefSync($('prefSync').checked));
 
-    async function loadAll(){
-      show(el('loading'),true); set(el('error'),'');
-      try{
-        const p=await getJSON('/payments');
-        paymentsCache=Array.isArray(p)?p:[];
-        renderPayments(); prefillAddDate();
-      }catch(e){ set(el('error'), e.message||'Ошибка загрузки'); }
-      finally{ show(el('loading'),false); bxFit(); }
+    let payments = [];
+    let editingId = null;
+
+    async function api(path, opt){
+      const r = await fetch(path, opt);
+      if (!r.ok) throw new Error(await r.text());
+      const ct = r.headers.get('content-type') || '';
+      return ct.includes('application/json') ? r.json() : r.text();
     }
 
-    function prefillAddDate(){ if(!el('inDate').value) el('inDate').value=todayYMD(); }
+    async function load(){
+      show($('loading'), true); set($('error'),'');
+      try{
+        payments = await api('/payments');
+        render(); prefillDate();
+      }catch(e){ set($('error'), e.message||'Ошибка загрузки'); }
+      finally{ show($('loading'), false); }
+    }
 
-    function renderPayments(){
-      const tbody=el('rows'); tbody.innerHTML='';
-      if(!paymentsCache.length){ tbody.innerHTML='<tr><td colspan="8" class="muted" style="text-align:center;">Платежей нет</td></tr>'; bxFit(); return; }
+    function prefillDate(){ if(!$('inDate').value) $('inDate').value = todayYMD(); }
 
-      for(const p of paymentsCache){
-        const k=kind(p); const isPlan=isFuture(p.date); const tr=document.createElement('tr'); tr.dataset.id=p.id;
-        if(isPlan) tr.classList.add(k==='expense'?'future-expense':k==='income'?'future-income':'future');
+    function counterparty(p){
+      const name = (p.contact_name && p.contact_name.trim()) ? p.contact_name :
+                   (p.company_name && p.company_name.trim()) ? p.company_name : '';
+      if (name) return name;
+      if (p.contact_id) return '#'+p.contact_id;
+      if (p.company_id) return '#'+p.company_id;
+      return '';
+    }
 
-        if(editingRowId===p.id){
-          tr.innerHTML=`
+    function render(){
+      const tbody = $('rows');
+      tbody.innerHTML = '';
+      if(!payments.length){
+        tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center;">Платежей нет</td></tr>';
+        return;
+      }
+
+      for(const p of payments){
+        const k = kind(p);
+        const future = isFuture(p.date);
+
+        const tr = document.createElement('tr');
+        if(future) tr.classList.add(k==='income'?'future-income':'future-expense');
+
+        if (editingId === p.id){
+          tr.innerHTML = `
             <td>${p.id}</td>
-            <td><input type="date" value="${toInputDate(p.date)}" data-field="date" /></td>
-            <td><input type="number" step="0.01" value="${p.amount??''}" data-field="amount" /></td>
-            <td><select data-field="category">${categories.map(c=>`<option ${c===p.category?'selected':''}>${c}</option>`).join('')}${p.category&&!categories.includes(p.category)?`<option selected>${p.category}</option>`:''}</select></td>
-            <td class="muted">${p.project_name??''}</td>
+            <td><input type="date" value="${toYMD(p.date)}" data-f="date" /></td>
+            <td><input type="number" step="0.01" value="${p.amount ?? ''}" data-f="amount" /></td>
+            <td>
+              <select data-f="category">
+                ${['Выручка','Расход','Перевод','Зарплата','Налоги','Тест']
+                  .map(c=>`<option ${c===p.category?'selected':''}>${c}</option>`).join('')}
+                ${p.category && !['Выручка','Расход','Перевод','Зарплата','Налоги','Тест'].includes(p.category) ? `<option selected>${p.category}</option>` : ''}
+              </select>
+              ${p.comment ? `<div class="muted" style="margin-top:4px">${p.comment}</div>` : ''}
+            </td>
+            <td class="muted">${p.project_name ?? ''}</td>
             <td class="muted">${counterparty(p)}</td>
-            <td class="muted">${p.cashbox??''}</td>
+            <td class="muted">${p.cashbox ?? ''}</td>
             <td class="actions">
-              <button data-save="${p.id}" class="primary">Сохранить</button>
-              <button data-cancel="${p.id}">Отмена</button>
+              <button class="btn btn--primary" data-save="${p.id}">Сохранить</button>
+              <button class="btn" data-cancel="${p.id}">Отмена</button>
             </td>`;
-        }else{
-          tr.innerHTML=`
+        } else {
+          tr.innerHTML = `
             <td>${p.id}</td>
             <td>${fmtDate(p.date)}</td>
-            <td><span class="amount ${classFor(k)}">${signFor(k)}${fmtMoney(p.amount,true)}</span>${isPlan?'<span class="tag">План</span>':''}</td>
-            <td>${p.category??''}${p.comment?`<div class="muted">${p.comment}</div>`:''}</td>
-            <td>${p.project_name??''}</td>
+            <td>
+              <span class="amount ${k==='income'?'income':(k==='expense'?'expense':'')}">
+                ${signFor(k)}${fmtMoney(p.amount)}
+              </span>
+              ${future ? '<span class="tag">План</span>' : ''}
+            </td>
+            <td>${p.category ?? ''}${p.comment ? `<div class="muted">${p.comment}</div>` : ''}</td>
+            <td>${p.project_name ?? ''}</td>
             <td>${counterparty(p)}</td>
-            <td>${p.cashbox??''}</td>
+            <td>${p.cashbox ?? ''}</td>
             <td class="actions">
-              <button data-edit="${p.id}">Редактировать</button>
-              <button data-del="${p.id}">Удалить</button>
-              <button data-bx="${p.id}">Битрикс</button>
+              <button class="btn" data-edit="${p.id}">Редактировать</button>
+              <button class="btn btn--danger" data-del="${p.id}">Удалить</button>
+              <button class="btn btn--ghost" data-bx="${p.id}">Битрикс</button>
             </td>`;
         }
+
         tbody.appendChild(tr);
       }
 
-      tbody.onclick=async (e)=>{
-        const btn=e.target.closest('button'); if(!btn) return;
-        const id=Number(btn.dataset.edit||btn.dataset.del||btn.dataset.save||btn.dataset.cancel||btn.dataset.bx); if(!id) return;
+      // Делегирование событий таблицы
+      $('rows').onclick = async (e)=>{
+        const btn = e.target.closest('button'); if(!btn) return;
+        const id = Number(btn.dataset.edit || btn.dataset.del ||
+                          btn.dataset.save || btn.dataset.cancel || btn.dataset.bx);
+        if(!id) return;
 
-        if(btn.hasAttribute('data-edit')){ editingRowId=id; renderPayments(); bxFit(); return; }
-        if(btn.hasAttribute('data-cancel')){ editingRowId=null; renderPayments(); bxFit(); return; }
-        if(btn.hasAttribute('data-del')){ if(!confirm(`Удалить платёж #${id}?`)) return; await deletePayment(id, btn.closest('tr')); bxFit(); return; }
-        if(btn.hasAttribute('data-save')){ await saveEditedRow(id, btn.closest('tr')); bxFit(); return; }
-        if(btn.hasAttribute('data-bx')){ await linkBitrix(id); return; }
+        // Режимы
+        if(btn.hasAttribute('data-edit')){ editingId = id; render(); return; }
+        if(btn.hasAttribute('data-cancel')){ editingId = null; render(); return; }
+
+        if(btn.hasAttribute('data-del')){
+          if(!confirm(`Удалить платёж #${id}?`)) return;
+          try{
+            await api(`/payments/${id}`, { method:'DELETE' });
+            payments = payments.filter(x=>x.id!==id);
+            render();
+          }catch(err){ alert('Ошибка удаления: '+err.message); }
+          return;
+        }
+
+        if(btn.hasAttribute('data-save')){
+          const tr = btn.closest('tr');
+          const get = (f)=> tr.querySelector(`[data-f="${f}"]`)?.value ?? '';
+          const patch = {
+            date: get('date') || todayYMD(),
+            amount: Number(String(get('amount')).replace(',', '.').trim()),
+            category: String(get('category')).trim() || 'Тест'
+          };
+          if(!patch.date || !Number.isFinite(patch.amount) || !patch.category){ alert('Заполните дату, сумму, категорию'); return; }
+          try{
+            const upd = await api(`/payments/${id}`, {
+              method:'PUT',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify(patch)
+            });
+            const i = payments.findIndex(x=>x.id===id);
+            if(i>-1) payments[i]=upd;
+            editingId=null; render();
+          }catch(err){ alert('Ошибка сохранения: '+err.message); }
+          return;
+        }
+
+        if(btn.hasAttribute('data-bx')){
+          const deal = prompt('ID сделки (Bitrix):\n(оставьте пустым, если не нужно)');
+          if(deal===null) return;
+          const sync = $('prefSync').checked;
+          try{
+            const upd = await api(`/payments/${id}/link/bitrix`, {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ deal_id: deal ? Number(deal) : undefined, sync_amount: sync })
+            });
+            const i = payments.findIndex(x=>x.id===id);
+            if(i>-1) payments[i]=upd;
+            render();
+          }catch(err){ alert('Ошибка Bitrix: '+err.message); }
+          return;
+        }
       };
-
-      bxFit();
     }
 
-    async function saveEditedRow(id,tr){
+    // Добавление нового платежа
+    $('btnAdd').onclick = async ()=>{
+      const data = {
+        date: $('inDate').value || todayYMD(),
+        amount: Number(String($('inAmount').value).replace(',', '.')),
+        category: $('inCategory').value,
+        comment: $('inComment').value || null
+      };
+      if(!data.date || !Number.isFinite(data.amount) || !data.category){
+        alert('Заполните дату, сумму и категорию'); return;
+      }
       try{
-        const getVal=sel=>tr.querySelector(`[data-field="${sel}"]`)?.value??'';
-        const date=getVal('date')||todayYMD();
-        const amount=Number(String(getVal('amount')).replace(',', '.').trim());
-        const category=String(getVal('category')).trim();
-        const comment=null;
-        if(!date||!category||isNaN(amount)) throw new Error('Заполните корректно дату, сумму и категорию');
+        const created = await api('/payments', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(data)
+        });
+        payments.unshift(created);
+        $('inAmount').value=''; $('inComment').value='';
+        render();
+      }catch(err){ alert('Ошибка добавления: '+err.message); }
+    };
 
-        await getJSON(`/payments/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date,amount,category,comment}) });
-        editingRowId=null; await loadAll();
-      }catch(e){ set(el('error'), e.message||'Ошибка сохранения'); }
-    }
-
-    async function deletePayment(id,row){
-      try{
-        row?.classList.add('danger');
-        const r=await fetch(`/payments/${id}`, {method:'DELETE'});
-        if(r.status!==204){ const t=await r.text(); throw new Error(`API ${r.status}: ${t}`); }
-        if(editingRowId===id) editingRowId=null;
-        await loadAll();
-      }catch(e){ set(el('error'), e.message||'Ошибка удаления'); row?.classList.remove('danger'); }
-    }
-
-    // ОДНА кнопка «Битрикс»: тянуть сумму = по настройке или если сумма пустая
-    async function linkBitrix(id){
-      try{
-        const dealId=prompt('Укажи ID сделки в Битрикс (число):',''); if(!dealId) return;
-        const dealNum=Number(dealId); if(!Number.isFinite(dealNum)) throw new Error('ID сделки должен быть числом');
-
-        const cur=paymentsCache.find(x=>x.id===id)||{};
-        const amountEmpty = cur.amount===null || cur.amount===undefined || cur.amount==='' || Number(cur.amount)===0;
-        const sync = (localStorage.getItem('bx_sync_amount')==='1') || amountEmpty;
-
-        show(el('loading'),true); set(el('error'),'');
-        await getJSON(`/payments/${id}/link/bitrix`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({deal_id:dealNum, sync_amount:sync}) });
-        await loadAll();
-        alert(sync?'Данные и сумма подтянуты ✅':'Данные подтянуты (сумма без изменений) ✅');
-      }catch(e){ set(el('error'), e.message||'Ошибка связи с Битрикс'); }
-      finally{ show(el('loading'),false); bxFit(); }
-    }
-
-    el('btnAdd').addEventListener('click', async ()=>{
-      show(el('loading'),true); set(el('error'),'');
-      try{
-        const date=el('inDate').value||todayYMD();
-        const amount=Number(el('inAmount').value.replace(',', '.').trim());
-        const category=el('inCategory').value.trim();
-        const comment=el('inComment').value.trim()||null;
-        if(!date||!category||isNaN(amount)) throw new Error('Заполните: дату, сумму и категорию');
-
-        await getJSON('/payments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date,amount,category,comment}) });
-        el('inAmount').value=''; el('inComment').value=''; await loadAll();
-      }catch(e){ set(el('error'), e.message||'Ошибка добавления'); }
-      finally{ show(el('loading'),false); bxFit(); }
-    });
-
-    loadAll();
+    // Первый запуск
+    load();
   </script>
 </body>
 </html>
