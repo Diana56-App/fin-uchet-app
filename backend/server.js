@@ -90,7 +90,6 @@ app.post('/payments', async (req, res) => {
 });
 
 // ---------------- PUT (safe merge) ----------------
-// Не затираем битрикс-поля, если пришли пустыми: берём из текущей записи.
 app.put('/payments/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -101,16 +100,13 @@ app.put('/payments/:id', async (req, res) => {
       return res.status(400).json({ error: 'date, amount, category — обязательны' });
     }
 
-    // Читаем текущую запись
     const curQ = await pool.query(`SELECT ${SELECT_FIELDS} FROM payments WHERE id=$1`, [id]);
     const cur = curQ.rows[0];
     if (!cur) return res.status(404).json({ error: 'Not found' });
 
-    // Хелпер: если значение не задано (null/undefined/''), оставляем текущее
     const keep = (val, existing) =>
       (val === undefined || val === null || val === '') ? existing : val;
 
-    // Собираем окончательные значения
     const final = {
       date:           p.date,
       amount:         p.amount,
@@ -121,13 +117,10 @@ app.put('/payments/:id', async (req, res) => {
       article:        p.article ?? null,
       cashbox:        p.cashbox ?? null,
       comment:        p.comment ?? null,
-
-      // Битрикс-поля — берём из тела, а если там пусто, то из текущей строки
       deal_id:        keep(p.deal_id,        cur.deal_id),
       contact_id:     keep(p.contact_id,     cur.contact_id),
       company_id:     keep(p.company_id,     cur.company_id),
       project_id:     keep(p.project_id,     cur.project_id),
-
       deal_name:      keep(p.deal_name,      cur.deal_name),
       contact_name:   keep(p.contact_name,   cur.contact_name),
       company_name:   keep(p.company_name,   cur.company_name),
@@ -147,15 +140,12 @@ app.put('/payments/:id', async (req, res) => {
       final.date, final.amount, final.category, final.project, final.contractor,
       final.operation_type, final.article, final.cashbox, final.comment,
       final.deal_id, final.contact_id, final.company_id, final.project_id,
-      final.deal_name, final.contact_name, final.company_name, final.project_name,
+      final.deal_name, final.contact_name, final_company = final.company_name, final.project_name,
       id
     ];
-
-    const { rows } = await pool.query(sql, v);
-    res.json(rows[0]);
   } catch (e) {
     console.error('PUT /payments/:id error:', e);
-    res.status(500).json({ error: 'Failed to update payment' });
+    return res.status(500).json({ error: 'Failed to update payment' });
   }
 });
 
@@ -240,13 +230,9 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
         patch.project_name = await bitrix.getCategoryName(catId);
       }
 
-      // При необходимости подтягиваем сумму из сделки
       if (sync_amount) {
-        const amt =
-          Number(deal.OPPORTUNITY ?? deal.AMOUNT ?? deal.SUM ?? deal.BUDGET ?? 0);
-        if (Number.isFinite(amt) && amt !== 0) {
-          patch.amount = amt;
-        }
+        const amt = Number(deal.OPPORTUNITY ?? deal.AMOUNT ?? deal.SUM ?? deal.BUDGET ?? 0);
+        if (Number.isFinite(amt) && amt !== 0) patch.amount = amt;
       }
     }
 
@@ -284,25 +270,14 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
   }
 });
 
-// ---------------- Bitrix: endpoints for local app ----------------
-// Установка приложения (Bitrix вызывает этот URL МЕТОДОМ POST).
-app.post('/install', (req, res) => {
-  res
-    .status(200)
-    .set('Content-Type', 'text/html; charset=utf-8')
-    .send(`<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><title>Install OK</title></head>
-<body style="font-family:system-ui,Arial,sans-serif;padding:20px">
-  <h3>Финучёт установлен</h3>
-  <p>Это служебная страница установки. Можете закрыть её и открыть приложение из меню Битрикс.</p>
-</body></html>`);
-});
+// ---------------- Bitrix: точки входа ----------------
+// 1) /install — Bitrix дергает при установке (POST), а иногда и GET'ом.
+// В любом случае просто ведём пользователя в интерфейс приложения.
+app.post('/install', (req, res) => res.redirect(302, '/app.html'));
+app.get('/install',  (req, res) => res.redirect(302, '/app.html'));
 
-// Основной обработчик приложения — Bitrix открывает этот URL в iFrame.
-app.get('/handler', (req, res) => {
-  // Если понадобится, можно читать параметры из req.query (member_id, DOMAIN, auth и т.п.)
-  res.redirect(302, '/app.html');
-});
+// 2) /handler — основная точка входа для iFrame. Ведём в интерфейс.
+app.get('/handler', (req, res) => res.redirect(302, '/app.html'));
 
 // ---------------- START ----------------
 app.listen(PORT, () => {
