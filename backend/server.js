@@ -13,31 +13,10 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ---- DB init
 init()
   .then(() => console.log('DB init OK'))
   .catch((err) => { console.error('DB init error:', err); process.exit(1); });
 
-// ---- Diagnostics
-app.get('/health', (_req, res) => {
-  res.json({ ok: true, ts: new Date().toISOString() });
-});
-
-app.get('/dbcheck', async (_req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT 1 AS ok');
-    res.json({ db: 'ok', result: rows[0] });
-  } catch (e) {
-    console.error('/dbcheck error:', e);
-    res.status(500).json({ db: 'error' });
-  }
-});
-
-app.get('/version', (_req, res) => {
-  res.json({ version: '0.1.0' });
-});
-
-// ---- Common fields
 const SELECT_FIELDS = `
   id, date, amount::float8 AS amount, category, project, contractor,
   operation_type, article, cashbox, comment,
@@ -45,8 +24,27 @@ const SELECT_FIELDS = `
   deal_name, contact_name, company_name, project_name
 `;
 
+// ---------------- Диагностика ----------------
+app.get('/health', (req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
+});
+
+app.get('/dbcheck', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT 1 AS ok');
+    res.json({ db: 'ok', result: rows[0] });
+  } catch (e) {
+    console.error('dbcheck error:', e);
+    res.status(500).json({ db: 'fail', error: String(e) });
+  }
+});
+
+app.get('/version', (req, res) => {
+  res.json({ version: '0.1.0' });
+});
+
 // ---------------- GET ----------------
-app.get('/payments', async (_req, res) => {
+app.get('/payments', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT ${SELECT_FIELDS} FROM payments ORDER BY date DESC, id DESC`
@@ -103,14 +101,16 @@ app.put('/payments/:id', async (req, res) => {
       return res.status(400).json({ error: 'date, amount, category — обязательны' });
     }
 
-    // Текущая запись
+    // Читаем текущую запись
     const curQ = await pool.query(`SELECT ${SELECT_FIELDS} FROM payments WHERE id=$1`, [id]);
     const cur = curQ.rows[0];
     if (!cur) return res.status(404).json({ error: 'Not found' });
 
+    // Хелпер: если значение не задано (null/undefined/''), оставляем текущее
     const keep = (val, existing) =>
       (val === undefined || val === null || val === '') ? existing : val;
 
+    // Собираем окончательные значения
     const final = {
       date:           p.date,
       amount:         p.amount,
@@ -122,6 +122,7 @@ app.put('/payments/:id', async (req, res) => {
       cashbox:        p.cashbox ?? null,
       comment:        p.comment ?? null,
 
+      // Битрикс-поля — берём из тела, а если там пусто, то из текущей строки
       deal_id:        keep(p.deal_id,        cur.deal_id),
       contact_id:     keep(p.contact_id,     cur.contact_id),
       company_id:     keep(p.company_id,     cur.company_id),
@@ -205,28 +206,105 @@ app.patch('/payments/:id/link', async (req, res) => {
   }
 });
 
+// ---------------- POST: автоподтяжка из Bitrix ----------------
+app.post('/payments/:id/link/bitrix', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id' });
+    if (!bitrix.ready) return res.status(400).json({ error: 'Bitrix webhook not configured' });
+
+    const curQ = await pool.query(`SELECT ${SELECT_FIELDS} FROM payments WHERE id=$1`, [id]);
+    const current = curQ.rows[0];
+    if (!current) return res.status(404).json({ error: 'Not found' });
+
+    let { deal_id = current.deal_id, contact_id = current.contact_id,
+          company_id = current.company_id, project_id = current.project_id,
+          sync_amount = false } = req.body || {};
+
+    const patch = {};
+
+    if (deal_id) {
+      const deal = await bitrix.getDeal(deal_id);
+      patch.deal_id = Number(deal_id);
+      patch.deal_name = deal.TITLE || null;
+
+      if (!contact_id && deal.CONTACT_ID) contact_id = Number(deal.CONTACT_ID);
+      if (!company_id && deal.COMPANY_ID) company_id = Number(deal.COMPANY_ID);
+
+      const ufName = await bitrix.getDealProjectNameFromUserField(deal);
+      if (ufName) patch.project_name = ufName;
+
+      if (!patch.project_name && deal.CATEGORY_ID !== undefined && deal.CATEGORY_ID !== null) {
+        const catId = Number(deal.CATEGORY_ID);
+        patch.project_id = catId;
+        patch.project_name = await bitrix.getCategoryName(catId);
+      }
+
+      // При необходимости подтягиваем сумму из сделки
+      if (sync_amount) {
+        const amt =
+          Number(deal.OPPORTUNITY ?? deal.AMOUNT ?? deal.SUM ?? deal.BUDGET ?? 0);
+        if (Number.isFinite(amt) && amt !== 0) {
+          patch.amount = amt;
+        }
+      }
+    }
+
+    if (contact_id) {
+      const c = await bitrix.getContact(contact_id);
+      const name = [c.NAME, c.LAST_NAME].filter(Boolean).join(' ').trim();
+      patch.contact_id = Number(contact_id);
+      patch.contact_name = name || c.HONORIFIC || null;
+    }
+
+    if (company_id) {
+      const co = await bitrix.getCompany(company_id);
+      patch.company_id = Number(company_id);
+      patch.company_name = co.TITLE || co.COMPANY_TITLE || null;
+    }
+
+    if (project_id && !patch.project_name) {
+      const name = await bitrix.getCategoryName(project_id);
+      if (name) { patch.project_id = Number(project_id); patch.project_name = name; }
+    }
+
+    if (!Object.keys(patch).length) return res.json(current);
+
+    const sets = Object.keys(patch).map((k, i) => `${k} = $${i + 1}`).join(', ');
+    const values = Object.keys(patch).map(k => patch[k]); values.push(id);
+
+    const { rows } = await pool.query(
+      `UPDATE payments SET ${sets} WHERE id = $${values.length} RETURNING ${SELECT_FIELDS}`,
+      values
+    );
+    res.json(rows[0]);
+  } catch (e) {
+    console.error('POST /payments/:id/link/bitrix error:', e);
+    res.status(500).json({ error: 'Failed to fetch from Bitrix' });
+  }
+});
+
 // ---------------- Bitrix: endpoints for local app ----------------
-// 1) Установка приложения (Bitrix дергает при добавлении). Отдаём простой HTML с ОК.
-app.get('/install', (req, res) => {
+// Установка приложения (Bitrix вызывает этот URL МЕТОДОМ POST).
+app.post('/install', (req, res) => {
   res
     .status(200)
     .set('Content-Type', 'text/html; charset=utf-8')
-    .send(`
-      <!doctype html>
-      <html><head><meta charset="utf-8"><title>Install OK</title></head>
-      <body style="font-family:system-ui,Arial,sans-serif;padding:20px">
-        <h3>Финучёт установлен</h3>
-        <p>Можете закрыть это окно и открыть приложение из меню Битрикс.</p>
-      </body></html>
-    `);
+    .send(`<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>Install OK</title></head>
+<body style="font-family:system-ui,Arial,sans-serif;padding:20px">
+  <h3>Финучёт установлен</h3>
+  <p>Это служебная страница установки. Можете закрыть её и открыть приложение из меню Битрикс.</p>
+</body></html>`);
 });
 
-// 2) Основной обработчик приложения — просто перенаправляем на нашу страницу с UI.
+// Основной обработчик приложения — Bitrix открывает этот URL в iFrame.
 app.get('/handler', (req, res) => {
-  // Можно прокинуть параметры, если понадобятся: const { member_id, DOMAIN } = req.query;
+  // Если понадобится, можно читать параметры из req.query (member_id, DOMAIN, auth и т.п.)
   res.redirect(302, '/app.html');
 });
 
+// ---------------- START ----------------
 app.listen(PORT, () => {
   console.log(`Server started at http://localhost:${PORT}`);
 });
