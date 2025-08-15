@@ -86,10 +86,75 @@
   <div class="container">
     <h1>Финансы Сталкер</h1>
     <div class="box" id="payments-box">
-      <!-- Тут появится интерфейс -->
+      <form id="payment-form">
+        <input type="text" name="title" placeholder="Название" required>
+        <input type="number" name="amount" placeholder="Сумма" required step="0.01">
+        <button type="submit" class="btn">Добавить</button>
+      </form>
+      <table id="payments-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Название</th>
+            <th>Сумма</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
   </div>
 
-  <script src="payments.js"></script>
+  <script>
+    const tableBody = document.querySelector('#payments-table tbody');
+    const form = document.getElementById('payment-form');
+
+    async function loadPayments() {
+      tableBody.innerHTML = '<tr><td colspan="3">Загрузка...</td></tr>';
+      try {
+        const resp = await fetch('/payments');
+        const data = await resp.json();
+        tableBody.innerHTML = '';
+        if (!data.length) {
+          tableBody.innerHTML = '<tr><td colspan="3">Нет данных</td></tr>';
+          return;
+        }
+        data.forEach(p => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${p.id}</td>
+            <td>${p.title || ''}</td>
+            <td>${p.amount || ''}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+      } catch (err) {
+        tableBody.innerHTML = '<tr><td colspan="3">Ошибка загрузки</td></tr>';
+      }
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const body = {};
+      formData.forEach((v, k) => body[k] = v);
+      try {
+        const resp = await fetch('/payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (resp.ok) {
+          form.reset();
+          loadPayments();
+        } else {
+          alert('Ошибка при добавлении');
+        }
+      } catch (err) {
+        alert('Ошибка сети');
+      }
+    });
+
+    loadPayments();
+  </script>
 </body>
 </html>
