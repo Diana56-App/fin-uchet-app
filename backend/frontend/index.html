@@ -3,75 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <title>Финансы Сталкер</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --brand:#b20054;
-      --brand-dark:#82003d;
-      --bg:#f4f5f7;
-      --card:#fff;
-      --muted:#6b7280;
-      --row-alt:#faf5fb;
-      --thead:#fde7f3;
-      --danger:#b42318;
+      --brand:#b20054; --brand-dark:#82003d;
+      --bg:#f4f5f7; --card:#fff; --thead:#fde7f3;
+      --row:#ffffff; --row-alt:#faf5fb;
+      --muted:#6b7280; --border:#e5e7eb;
+      --green:#0f9d58; --red:#c5221f; --gray:#6b7280;
     }
     *{box-sizing:border-box}
-    body{
-      background:var(--bg);
-      font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;
-      margin:0;padding:0;color:#111827;
-    }
-    .container{
-      max-width:1100px;margin:36px auto;background:var(--card);
-      border-radius:18px;box-shadow:0 8px 36px #d0c6db42;padding:8px 0 28px 0;
-    }
-    header{
-      display:flex;align-items:center;justify-content:space-between;
-      padding:22px 28px 6px 28px;
-    }
-    h1{
-      margin:0;color:var(--brand);font-size:2.1rem;font-weight:800;
-    }
-    .toolbar{display:flex;gap:10px;align-items:center}
-    .btn{
-      background:var(--brand);color:#fff;border:none;padding:10px 18px;border-radius:10px;
-      font-size:.95rem;cursor:pointer;transition:.15s;box-shadow:0 2px 8px #b2005440
-    }
+    body{margin:0;background:var(--bg);font-family:'Segoe UI',system-ui,Arial,sans-serif;color:#111827}
+    .container{max-width:1100px;margin:28px auto;background:var(--card);border-radius:18px;box-shadow:0 8px 36px #d0c6db42;padding:8px 0 24px}
+    header{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:18px 24px 8px}
+    h1{margin:0;color:var(--brand);font-size:2rem;font-weight:800}
+    .btn{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:.95rem;cursor:pointer;transition:.15s}
     .btn:hover{background:var(--brand-dark)}
-    .btn.outline{background:#fff;color:var(--brand);border:1px solid var(--brand);box-shadow:none}
-    .btn.danger{background:var(--danger)}
-    .box{padding:18px 24px}
-    .hint{color:var(--muted);font-size:.9rem}
-
-    .table-wrap{
-      margin-top:14px;border:1px solid #eee;border-radius:12px;overflow:auto;max-height:70vh;
-      background:#fff;
-    }
-    table{width:100%;border-collapse:separate;border-spacing:0;min-width:900px}
-    thead th{
-      position:sticky;top:0;background:var(--thead);color:var(--brand);text-align:left;
-      font-weight:700;padding:12px 10px;border-bottom:1px solid #f2c6df;z-index:1
-    }
-    tbody td{padding:10px 10px;border-bottom:1px solid #f3f4f6;font-size:0.98rem}
-    tbody tr:nth-child(odd){background:var(--row-alt)}
-    tbody tr:hover{background:#fce7f3}
-    .right{text-align:right}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#f3e8ff;color:#6d28d9;font-size:.78rem}
-
-    /* Форма добавления */
-    .form{
-      display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-top:10px
-    }
-    .form .field{display:flex;flex-direction:column;gap:6px}
-    .form label{font-size:.85rem;color:#374151}
-    .form input,.form select, .form textarea{
-      padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:.95rem;min-width:180px
-    }
-    .form textarea{min-width:260px;min-height:38px;resize:vertical}
-
-    @media (max-width:700px){
-      header{flex-direction:column;align-items:flex-start;gap:10px}
-      .form{flex-direction:column;align-items:stretch}
+    .btn.secondary{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+    .box{padding:12px 24px}
+    .filters{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:520px}
+    select{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff}
+    .muted{color:var(--muted);font-size:.9rem}
+    .summary{display:flex;gap:16px;align-items:center;font-weight:700}
+    .summary .in{color:var(--green)} .summary .out{color:var(--red)} .summary .bal{color:#111827}
+    .table-wrap{margin-top:12px;border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:70vh;background:#fff}
+    table{width:100%;min-width:980px;border-collapse:separate;border-spacing:0}
+    thead th{position:sticky;top:0;background:var(--thead);color:var(--brand);text-align:left;font-weight:700;padding:10px;border-bottom:1px solid #f2c6df;z-index:1}
+    tbody td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+    tbody tr:nth-child(odd){background:var(--row)}
+    tbody tr:nth-child(even){background:var(--row-alt)}
+    tbody tr:hover{filter:brightness(.98)}
+    .op.plus{color:var(--green);font-weight:700}
+    .op.minus{color:var(--red);font-weight:700}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:.78rem;margin-left:6px}
+    .actions{display:flex;gap:8px}
+    .iconbtn{border:1px solid var(--border);background:#fff;border-radius:10px;padding:6px 8px;cursor:pointer}
+    .iconbtn:hover{background:#f9fafb}
+    .hidden{display:none}
+    @media (max-width:720px){
+      header{flex-direction:column;align-items:flex-start}
+      .filters{grid-template-columns:1fr}
       .table-wrap{max-height:60vh}
     }
   </style>
@@ -80,246 +51,292 @@
   <div class="container">
     <header>
       <h1>Финансы Сталкер</h1>
-      <div class="toolbar">
-        <button id="refreshBtn" class="btn outline">Обновить</button>
-        <button id="addToggle" class="btn">Добавить</button>
-      </div>
+      <button id="addBtn" class="btn">Добавить платёж</button>
     </header>
 
     <div class="box">
-      <div id="addForm" style="display:none;">
-        <div class="hint">Форма автоматически подстраивается под реальные колонки таблицы. Заполняй только нужное.</div>
-        <form id="payment-form" class="form"></form>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <button id="toggleBtn" class="btn secondary">Показать платежи</button>
+        <div class="filters">
+          <select id="opFilter">
+            <option value="all">Все операции</option>
+            <option value="income">Только доходы</option>
+            <option value="expense">Только расходы</option>
+            <option value="planned">План (будущие даты)</option>
+          </select>
+          <select id="cashFilter">
+            <option value="all">Все кассы</option>
+          </select>
+        </div>
+        <button id="resetBtn" class="btn secondary">Сбросить фильтры</button>
+        <div class="summary">
+          <span class="in">Доход: <span id="sumIn">0 ₽</span></span> •
+          <span class="out">Расход: <span id="sumOut">0 ₽</span></span> •
+          <span class="bal">Баланс: <span id="sumBal">0 ₽</span></span>
+        </div>
       </div>
 
-      <div class="table-wrap">
-        <table id="payments-table">
-          <thead><tr id="thead-row"></tr></thead>
+      <div class="table-wrap" id="wrap" style="display:none;margin-top:14px">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Операция</th>
+              <th>Статья/Описание</th>
+              <th>Сделка</th>
+              <th>Проект</th>
+              <th>Контрагент</th>
+              <th>Счёт/кассы</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
-      <div class="hint" style="margin-top:8px">Всего записей: <span id="count">0</span></div>
+
+      <div class="muted" style="margin-top:8px">Всего записей: <span id="count">0</span></div>
     </div>
   </div>
 
   <script>
-    // ---- Настройки отображения колонок ----
-    const preferredOrder = [
-      'id','date','created_at','updated_at',
-      'title','name','type','category','project','project_id',
-      'amount','currency',
-      'note','comment','description',
-      'bitrix_deal_id','bitrix_title','bitrix_contact_id','bitrix_company_id','bitrix_stage_id','bitrix_amount'
-    ];
-    const rightAlign = new Set(['amount','bitrix_amount']);
-    const hiddenByDefault = new Set([]); // можно скрыть колонки, если надо
-
+    // API
     const API = {
-      list: '/payments',
-      create: '/payments',
-      remove: id => `/payments/${id}`,
+      list:'/payments',
+      create:'/payments',
+      remove:id=>`/payments/${id}`,
+      linkBitrix:id=>`/payments/${id}/link/bitrix`,
+      patch:id=>`/payments/${id}/link`
     };
 
-    const el = sel => document.querySelector(sel);
-    const theadRow = el('#thead-row');
-    const tbody = el('#tbody');
-    const countEl = el('#count');
-    const addFormWrap = el('#addForm');
-    const addForm = el('#payment-form');
+    // helpers
+    const fmtMoney = n => {
+      const v = Number(n);
+      if (Number.isNaN(v)) return String(n ?? '');
+      return v.toLocaleString('ru-RU',{minimumFractionDigits:0, maximumFractionDigits:2}) + ' ₽';
+    };
+    const fmtDate = s => {
+      if (!s) return '';
+      const d = new Date(s);
+      if (isNaN(d)) return String(s);
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const yy = d.getFullYear();
+      return `${dd}.${mm}.${yy}`;
+    };
+    const isFuture = s => {
+      if (!s) return false;
+      const d = new Date(s);
+      if (isNaN(d)) return false;
+      const today = new Date(); today.setHours(0,0,0,0);
+      d.setHours(0,0,0,0);
+      return d.getTime() > today.getTime();
+    };
 
-    let columns = []; // фактические колонки из бэка
-    let rows = [];
+    // state
+    let all = [];
+    let filtered = [];
 
-    function orderKeys(keys){
-      const set = new Set(keys);
-      const prior = preferredOrder.filter(k => set.has(k));
-      const rest = keys.filter(k => !prior.includes(k)).sort();
-      return [...prior, ...rest].filter(k => !hiddenByDefault.has(k));
+    // ui refs
+    const tbody = document.getElementById('tbody');
+    const countEl = document.getElementById('count');
+    const sumInEl = document.getElementById('sumIn');
+    const sumOutEl = document.getElementById('sumOut');
+    const sumBalEl = document.getElementById('sumBal');
+    const wrap = document.getElementById('wrap');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const opFilter = document.getElementById('opFilter');
+    const cashFilter = document.getElementById('cashFilter');
+    const addBtn = document.getElementById('addBtn');
+
+    toggleBtn.onclick = ()=>{ wrap.style.display = wrap.style.display==='none' ? '' : 'none'; };
+
+    resetBtn.onclick = ()=>{
+      opFilter.value='all'; cashFilter.value='all'; render();
+    };
+
+    opFilter.onchange = render;
+    cashFilter.onchange = render;
+
+    addBtn.onclick = async ()=>{
+      // простой диалог добавления (без модалки)
+      const date = prompt('Дата (ГГГГ-ММ-ДД):', new Date().toISOString().slice(0,10));
+      if (date===null) return;
+      const amountStr = prompt('Сумма (плюс для дохода, минус для расхода):','0');
+      if (amountStr===null) return;
+      const category = prompt('Статья/описание:','');
+      const project = prompt('Проект:','');
+      const cashbox = prompt('Счёт/касса:','');
+
+      const body = {};
+      if (date) body.date = date;
+      if (amountStr) body.amount = Number(amountStr);
+      if (category) body.category = category;
+      if (project) body.project = project;
+      if (cashbox) body.cashbox = cashbox;
+
+      try{
+        const r = await fetch(API.create,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if (!r.ok) return alert('Не удалось сохранить');
+        await load();
+      }catch{ alert('Ошибка сети'); }
+    };
+
+    async function onDelete(id){
+      if (!confirm('Удалить запись #' + id + '?')) return;
+      try{
+        const r = await fetch(API.remove(id), { method:'DELETE' });
+        if (!r.ok) return alert('Не удалось удалить');
+        await load();
+      }catch{ alert('Ошибка сети'); }
     }
 
-    function money(v){
-      if (v === null || v === undefined || v === '') return '';
-      const n = Number(v);
-      if (Number.isNaN(n)) return String(v);
-      return n.toFixed(2);
-    }
-
-    function buildHead(){
-      theadRow.innerHTML = '';
-      columns.forEach(k => {
-        const th = document.createElement('th');
-        th.textContent = k;
-        theadRow.appendChild(th);
-      });
-      // колонка действий, если есть id
-      if (columns.includes('id')) {
-        const th = document.createElement('th');
-        th.textContent = 'Действия';
-        theadRow.appendChild(th);
-      }
-    }
-
-    function buildBody(){
-      tbody.innerHTML = '';
-      if (!rows.length){
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.colSpan = columns.length + (columns.includes('id') ? 1 : 0);
-        td.textContent = 'Нет данных';
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-        countEl.textContent = '0';
-        return;
-      }
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        columns.forEach(k => {
-          const td = document.createElement('td');
-          let val = r[k];
-          if (k === 'amount' || k === 'bitrix_amount') val = money(val);
-          if (k === 'type' || k === 'category') {
-            const span = document.createElement('span');
-            span.className = 'badge';
-            span.textContent = val ?? '';
-            td.appendChild(span);
-          } else {
-            td.textContent = (val ?? '').toString();
-          }
-          if (rightAlign.has(k)) td.classList.add('right');
-          tr.appendChild(td);
+    async function onLinkBitrix(id){
+      const dealId = prompt('ID сделки Битрикс:','');
+      if (!dealId) return;
+      try{
+        const r = await fetch(API.linkBitrix(id), {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ dealId })
         });
-        if (columns.includes('id')) {
-          const td = document.createElement('td');
-          const btn = document.createElement('button');
-          btn.className = 'btn danger';
-          btn.textContent = 'Удалить';
-          btn.style.padding = '6px 10px';
-          btn.onclick = () => onDelete(r.id);
-          td.appendChild(btn);
-          tr.appendChild(td);
-        }
-        tbody.appendChild(tr);
-      });
-      countEl.textContent = String(rows.length);
+        if (!r.ok){ const t = await r.text(); console.error(t); return alert('Ошибка связи с Битрикс'); }
+        await load();
+      }catch{ alert('Ошибка сети'); }
     }
 
-    async function loadPayments(){
-      // индикатор
+    async function onEdit(id){
+      // примитивный inline-редактор через промпты
+      const row = all.find(x=>x.id===id);
+      if (!row) return;
+      const fields = ['date','amount','category','project','comment','cashbox'];
+      const patch = {};
+      fields.forEach(k=>{
+        const val = prompt(`${k}:`, row[k] ?? '');
+        if (val!==null && String(val).trim()!=='') patch[k]= (k==='amount'? Number(val): val);
+      });
+      if (!Object.keys(patch).length) return;
+      try{
+        const r = await fetch(API.patch(id), { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+        if (!r.ok) return alert('Не удалось обновить');
+        await load();
+      }catch{ alert('Ошибка сети'); }
+    }
+
+    function buildCashFilter(){
+      const set = new Set(all.map(x=>x.cashbox).filter(Boolean));
+      const current = cashFilter.value;
+      cashFilter.innerHTML = '<option value="all">Все кассы</option>' +
+        Array.from(set).sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+      if (Array.from(set).includes(current)) cashFilter.value=current;
+    }
+
+    function applyFilters(){
+      const type = opFilter.value;
+      const cash = cashFilter.value;
+
+      filtered = all.filter(x=>{
+        // касса
+        if (cash!=='all' && (x.cashbox||'')!==cash) return false;
+        // тип операции
+        const amt = Number(x.amount||0);
+        const future = isFuture(x.date);
+        if (type==='income' && !(amt>0)) return false;
+        if (type==='expense' && !(amt<0)) return false;
+        if (type==='planned' && !future) return false;
+        return true;
+      });
+    }
+
+    function renderTable(){
+      tbody.innerHTML='';
+      let sumIn=0,sumOut=0;
+      filtered.forEach(row=>{
+        const tr = document.createElement('tr');
+
+        // дата + бейдж "план"
+        const tdDate = document.createElement('td');
+        tdDate.textContent = fmtDate(row.date);
+        if (isFuture(row.date)){
+          const b = document.createElement('span'); b.className='badge'; b.textContent='план';
+          tdDate.appendChild(b);
+        }
+        tr.appendChild(tdDate);
+
+        // операция (знак и сумма)
+        const tdOp = document.createElement('td');
+        const amt = Number(row.amount||0);
+        if (amt>=0){ tdOp.className='op plus'; tdOp.textContent = '+ ' + fmtMoney(amt); sumIn+=amt; }
+        else { tdOp.className='op minus'; tdOp.textContent = '- ' + fmtMoney(Math.abs(amt)); sumOut+=Math.abs(amt); }
+        tr.appendChild(tdOp);
+
+        // статья/описание
+        const tdArt = document.createElement('td');
+        tdArt.textContent = row.category || row.comment || row.article || '';
+        tr.appendChild(tdArt);
+
+        // сделка (берём bitrix_title если есть)
+        const tdDeal = document.createElement('td');
+        tdDeal.textContent = row.bitrix_title || '';
+        tr.appendChild(tdDeal);
+
+        // проект
+        const tdProj = document.createElement('td');
+        tdProj.textContent = row.project || '';
+        tr.appendChild(tdProj);
+
+        // контрагент (если есть название)
+        const tdContr = document.createElement('td');
+        tdContr.textContent = row.company_name || '';
+        tr.appendChild(tdContr);
+
+        // счёт/касса
+        const tdCash = document.createElement('td');
+        tdCash.textContent = row.cashbox || '';
+        tr.appendChild(tdCash);
+
+        // действия
+        const tdAct = document.createElement('td');
+        tdAct.className='actions';
+        const btnLink = document.createElement('button'); btnLink.className='iconbtn'; btnLink.title='Связать с Битрикс'; btnLink.textContent='🔗';
+        btnLink.onclick=()=>onLinkBitrix(row.id);
+        const btnEdit = document.createElement('button'); btnEdit.className='iconbtn'; btnEdit.title='Редактировать'; btnEdit.textContent='✏️';
+        btnEdit.onclick=()=>onEdit(row.id);
+        const btnDel = document.createElement('button'); btnDel.className='iconbtn'; btnDel.title='Удалить'; btnDel.textContent='🗑️';
+        btnDel.onclick=()=>onDelete(row.id);
+        tdAct.append(btnLink, btnEdit, btnDel);
+        tr.appendChild(tdAct);
+
+        tbody.appendChild(tr);
+      });
+
+      countEl.textContent = String(filtered.length);
+      sumInEl.textContent = fmtMoney(sumIn);
+      sumOutEl.textContent = fmtMoney(sumOut);
+      sumBalEl.textContent = fmtMoney(sumIn - sumOut);
+    }
+
+    function render(){
+      applyFilters();
+      renderTable();
+    }
+
+    async function load(){
       tbody.innerHTML = '<tr><td>Загрузка...</td></tr>';
       try{
-        const resp = await fetch(API.list);
-        const data = await resp.json();
-        if (!Array.isArray(data)) throw new Error('Ответ API не массив');
-        rows = data;
-
-        // собираем список колонок по всем записям
-        const keySet = new Set();
-        rows.forEach(obj => Object.keys(obj||{}).forEach(k => keySet.add(k)));
-        columns = orderKeys(Array.from(keySet));
-        // если пусто — покажем базовые поля
-        if (!columns.length) columns = ['id','title','amount'];
-
-        buildHead();
-        buildBody();
-        buildCreateForm(); // форма зависит от колонок
+        const r = await fetch(API.list);
+        const data = await r.json();
+        all = Array.isArray(data) ? data : [];
+        buildCashFilter();
+        render();
       }catch(e){
         tbody.innerHTML = '<tr><td>Ошибка загрузки</td></tr>';
         console.error(e);
       }
     }
 
-    function buildCreateForm(){
-      addForm.innerHTML = '';
-      const fields = [];
-
-      // Предлагаем поля только из реально существующих колонок:
-      const candidates = [
-        {key:'title', label:'Название', type:'text'},
-        {key:'amount', label:'Сумма', type:'number', step:'0.01'},
-        {key:'date', label:'Дата', type:'date'},
-        {key:'type', label:'Тип', type:'text'},
-        {key:'category', label:'Категория', type:'text'},
-        {key:'project', label:'Проект', type:'text'},
-        {key:'note', label:'Комментарий', type:'textarea'},
-      ];
-      candidates.forEach(c => {
-        if (columns.includes(c.key)) fields.push(c);
-      });
-
-      // если ни одного поля кроме id —fallback на title/amount
-      if (!fields.length){
-        fields.push({key:'title', label:'Название', type:'text'});
-        fields.push({key:'amount', label:'Сумма', type:'number', step:'0.01'});
-      }
-
-      fields.forEach(f=>{
-        const wrap = document.createElement('div');
-        wrap.className = 'field';
-        const lab = document.createElement('label');
-        lab.textContent = f.label;
-        const input = f.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
-        if (f.type !== 'textarea') input.type = f.type;
-        if (f.step) input.step = f.step;
-        input.name = f.key;
-        wrap.appendChild(lab);
-        wrap.appendChild(input);
-        addForm.appendChild(wrap);
-      });
-
-      const submit = document.createElement('button');
-      submit.className = 'btn';
-      submit.type = 'submit';
-      submit.textContent = 'Сохранить';
-      addForm.appendChild(submit);
-    }
-
-    async function onDelete(id){
-      if (!confirm(`Удалить запись #${id}?`)) return;
-      try{
-        const resp = await fetch(API.remove(id), { method:'DELETE' });
-        if (!resp.ok) throw new Error('Не удалось удалить');
-        await loadPayments();
-      }catch(e){
-        alert('Ошибка удаления');
-      }
-    }
-
-    addForm.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const fd = new FormData(addForm);
-      const body = {};
-      fd.forEach((v,k)=> body[k] = v);
-      // пустые строки не шлём
-      Object.keys(body).forEach(k => { if (String(body[k]).trim()==='') delete body[k]; });
-
-      try{
-        const resp = await fetch(API.create,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(body)
-        });
-        if (!resp.ok){
-          const t = await resp.text();
-          console.error(t);
-          alert('Ошибка сохранения');
-          return;
-        }
-        addForm.reset();
-        await loadPayments();
-      }catch(e){
-        alert('Ошибка сети');
-      }
-    });
-
-    // UI-переключатели
-    el('#addToggle').onclick = ()=>{
-      const shown = addFormWrap.style.display !== 'none';
-      addFormWrap.style.display = shown ? 'none' : '';
-    };
-    el('#refreshBtn').onclick = loadPayments;
-
-    // старт
-    loadPayments();
+    // init
+    load();
   </script>
 </body>
 </html>
