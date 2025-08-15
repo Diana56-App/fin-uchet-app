@@ -5,155 +5,320 @@
   <title>Финансы Сталкер</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      background: #f4f5f7;
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0; padding: 0;
+    :root{
+      --brand:#b20054;
+      --brand-dark:#82003d;
+      --bg:#f4f5f7;
+      --card:#fff;
+      --muted:#6b7280;
+      --row-alt:#faf5fb;
+      --thead:#fde7f3;
+      --danger:#b42318;
     }
-    .container {
-      max-width: 900px;
-      margin: 40px auto;
-      background: #fff;
-      border-radius: 18px;
-      box-shadow: 0 8px 36px #d0c6db42;
-      padding: 20px 0 40px 0;
+    *{box-sizing:border-box}
+    body{
+      background:var(--bg);
+      font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;
+      margin:0;padding:0;color:#111827;
     }
-    h1 {
-      text-align: left;
-      margin-left: 30px;
-      color: #b20054;
-      font-size: 2.2em;
-      font-weight: 700;
+    .container{
+      max-width:1100px;margin:36px auto;background:var(--card);
+      border-radius:18px;box-shadow:0 8px 36px #d0c6db42;padding:8px 0 28px 0;
     }
-    .box {
-      background: #fff;
-      max-width: 700px;
-      margin: 35px auto;
-      padding: 40px;
-      border-radius: 18px;
-      box-shadow: 0 4px 20px #d0c6db15;
-      min-height: 150px;
+    header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:22px 28px 6px 28px;
     }
-    .btn {
-      background: #b20054;
-      color: #fff;
-      border: none;
-      padding: 10px 26px;
-      border-radius: 8px;
-      font-size: 1em;
-      margin-bottom: 20px;
-      cursor: pointer;
-      transition: background 0.15s;
+    h1{
+      margin:0;color:var(--brand);font-size:2.1rem;font-weight:800;
     }
-    .btn:hover { background: #82003d; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 25px;
+    .toolbar{display:flex;gap:10px;align-items:center}
+    .btn{
+      background:var(--brand);color:#fff;border:none;padding:10px 18px;border-radius:10px;
+      font-size:.95rem;cursor:pointer;transition:.15s;box-shadow:0 2px 8px #b2005440
     }
-    th, td {
-      border-bottom: 1px solid #eee;
-      padding: 10px 8px;
-      text-align: left;
-      font-size: 1.05em;
+    .btn:hover{background:var(--brand-dark)}
+    .btn.outline{background:#fff;color:var(--brand);border:1px solid var(--brand);box-shadow:none}
+    .btn.danger{background:var(--danger)}
+    .box{padding:18px 24px}
+    .hint{color:var(--muted);font-size:.9rem}
+
+    .table-wrap{
+      margin-top:14px;border:1px solid #eee;border-radius:12px;overflow:auto;max-height:70vh;
+      background:#fff;
     }
-    th {
-      background: #fde7f3;
-      color: #b20054;
-      font-weight: 600;
+    table{width:100%;border-collapse:separate;border-spacing:0;min-width:900px}
+    thead th{
+      position:sticky;top:0;background:var(--thead);color:var(--brand);text-align:left;
+      font-weight:700;padding:12px 10px;border-bottom:1px solid #f2c6df;z-index:1
     }
-    form {
-      margin-bottom: 25px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 15px;
-      align-items: end;
+    tbody td{padding:10px 10px;border-bottom:1px solid #f3f4f6;font-size:0.98rem}
+    tbody tr:nth-child(odd){background:var(--row-alt)}
+    tbody tr:hover{background:#fce7f3}
+    .right{text-align:right}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#f3e8ff;color:#6d28d9;font-size:.78rem}
+
+    /* Форма добавления */
+    .form{
+      display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-top:10px
     }
-    form input, form select {
-      padding: 7px 9px;
-      border-radius: 5px;
-      border: 1px solid #bbb;
-      font-size: 1em;
-      width: 160px;
+    .form .field{display:flex;flex-direction:column;gap:6px}
+    .form label{font-size:.85rem;color:#374151}
+    .form input,.form select, .form textarea{
+      padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:.95rem;min-width:180px
     }
-    @media (max-width: 650px) {
-      .container, .box { padding: 10px !important; }
-      form { flex-direction: column; gap: 7px; }
+    .form textarea{min-width:260px;min-height:38px;resize:vertical}
+
+    @media (max-width:700px){
+      header{flex-direction:column;align-items:flex-start;gap:10px}
+      .form{flex-direction:column;align-items:stretch}
+      .table-wrap{max-height:60vh}
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Финансы Сталкер</h1>
-    <div class="box" id="payments-box">
-      <form id="payment-form">
-        <input type="text" name="title" placeholder="Название" required>
-        <input type="number" name="amount" placeholder="Сумма" required step="0.01">
-        <button type="submit" class="btn">Добавить</button>
-      </form>
-      <table id="payments-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Название</th>
-            <th>Сумма</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <header>
+      <h1>Финансы Сталкер</h1>
+      <div class="toolbar">
+        <button id="refreshBtn" class="btn outline">Обновить</button>
+        <button id="addToggle" class="btn">Добавить</button>
+      </div>
+    </header>
+
+    <div class="box">
+      <div id="addForm" style="display:none;">
+        <div class="hint">Форма автоматически подстраивается под реальные колонки таблицы. Заполняй только нужное.</div>
+        <form id="payment-form" class="form"></form>
+      </div>
+
+      <div class="table-wrap">
+        <table id="payments-table">
+          <thead><tr id="thead-row"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="hint" style="margin-top:8px">Всего записей: <span id="count">0</span></div>
     </div>
   </div>
 
   <script>
-    const tableBody = document.querySelector('#payments-table tbody');
-    const form = document.getElementById('payment-form');
+    // ---- Настройки отображения колонок ----
+    const preferredOrder = [
+      'id','date','created_at','updated_at',
+      'title','name','type','category','project','project_id',
+      'amount','currency',
+      'note','comment','description',
+      'bitrix_deal_id','bitrix_title','bitrix_contact_id','bitrix_company_id','bitrix_stage_id','bitrix_amount'
+    ];
+    const rightAlign = new Set(['amount','bitrix_amount']);
+    const hiddenByDefault = new Set([]); // можно скрыть колонки, если надо
 
-    async function loadPayments() {
-      tableBody.innerHTML = '<tr><td colspan="3">Загрузка...</td></tr>';
-      try {
-        const resp = await fetch('/payments');
-        const data = await resp.json();
-        tableBody.innerHTML = '';
-        if (!data.length) {
-          tableBody.innerHTML = '<tr><td colspan="3">Нет данных</td></tr>';
-          return;
-        }
-        data.forEach(p => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${p.id}</td>
-            <td>${p.title || ''}</td>
-            <td>${p.amount || ''}</td>
-          `;
-          tableBody.appendChild(tr);
-        });
-      } catch (err) {
-        tableBody.innerHTML = '<tr><td colspan="3">Ошибка загрузки</td></tr>';
+    const API = {
+      list: '/payments',
+      create: '/payments',
+      remove: id => `/payments/${id}`,
+    };
+
+    const el = sel => document.querySelector(sel);
+    const theadRow = el('#thead-row');
+    const tbody = el('#tbody');
+    const countEl = el('#count');
+    const addFormWrap = el('#addForm');
+    const addForm = el('#payment-form');
+
+    let columns = []; // фактические колонки из бэка
+    let rows = [];
+
+    function orderKeys(keys){
+      const set = new Set(keys);
+      const prior = preferredOrder.filter(k => set.has(k));
+      const rest = keys.filter(k => !prior.includes(k)).sort();
+      return [...prior, ...rest].filter(k => !hiddenByDefault.has(k));
+    }
+
+    function money(v){
+      if (v === null || v === undefined || v === '') return '';
+      const n = Number(v);
+      if (Number.isNaN(n)) return String(v);
+      return n.toFixed(2);
+    }
+
+    function buildHead(){
+      theadRow.innerHTML = '';
+      columns.forEach(k => {
+        const th = document.createElement('th');
+        th.textContent = k;
+        theadRow.appendChild(th);
+      });
+      // колонка действий, если есть id
+      if (columns.includes('id')) {
+        const th = document.createElement('th');
+        th.textContent = 'Действия';
+        theadRow.appendChild(th);
       }
     }
 
-    form.addEventListener('submit', async e => {
+    function buildBody(){
+      tbody.innerHTML = '';
+      if (!rows.length){
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = columns.length + (columns.includes('id') ? 1 : 0);
+        td.textContent = 'Нет данных';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        countEl.textContent = '0';
+        return;
+      }
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        columns.forEach(k => {
+          const td = document.createElement('td');
+          let val = r[k];
+          if (k === 'amount' || k === 'bitrix_amount') val = money(val);
+          if (k === 'type' || k === 'category') {
+            const span = document.createElement('span');
+            span.className = 'badge';
+            span.textContent = val ?? '';
+            td.appendChild(span);
+          } else {
+            td.textContent = (val ?? '').toString();
+          }
+          if (rightAlign.has(k)) td.classList.add('right');
+          tr.appendChild(td);
+        });
+        if (columns.includes('id')) {
+          const td = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.className = 'btn danger';
+          btn.textContent = 'Удалить';
+          btn.style.padding = '6px 10px';
+          btn.onclick = () => onDelete(r.id);
+          td.appendChild(btn);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      });
+      countEl.textContent = String(rows.length);
+    }
+
+    async function loadPayments(){
+      // индикатор
+      tbody.innerHTML = '<tr><td>Загрузка...</td></tr>';
+      try{
+        const resp = await fetch(API.list);
+        const data = await resp.json();
+        if (!Array.isArray(data)) throw new Error('Ответ API не массив');
+        rows = data;
+
+        // собираем список колонок по всем записям
+        const keySet = new Set();
+        rows.forEach(obj => Object.keys(obj||{}).forEach(k => keySet.add(k)));
+        columns = orderKeys(Array.from(keySet));
+        // если пусто — покажем базовые поля
+        if (!columns.length) columns = ['id','title','amount'];
+
+        buildHead();
+        buildBody();
+        buildCreateForm(); // форма зависит от колонок
+      }catch(e){
+        tbody.innerHTML = '<tr><td>Ошибка загрузки</td></tr>';
+        console.error(e);
+      }
+    }
+
+    function buildCreateForm(){
+      addForm.innerHTML = '';
+      const fields = [];
+
+      // Предлагаем поля только из реально существующих колонок:
+      const candidates = [
+        {key:'title', label:'Название', type:'text'},
+        {key:'amount', label:'Сумма', type:'number', step:'0.01'},
+        {key:'date', label:'Дата', type:'date'},
+        {key:'type', label:'Тип', type:'text'},
+        {key:'category', label:'Категория', type:'text'},
+        {key:'project', label:'Проект', type:'text'},
+        {key:'note', label:'Комментарий', type:'textarea'},
+      ];
+      candidates.forEach(c => {
+        if (columns.includes(c.key)) fields.push(c);
+      });
+
+      // если ни одного поля кроме id —fallback на title/amount
+      if (!fields.length){
+        fields.push({key:'title', label:'Название', type:'text'});
+        fields.push({key:'amount', label:'Сумма', type:'number', step:'0.01'});
+      }
+
+      fields.forEach(f=>{
+        const wrap = document.createElement('div');
+        wrap.className = 'field';
+        const lab = document.createElement('label');
+        lab.textContent = f.label;
+        const input = f.type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+        if (f.type !== 'textarea') input.type = f.type;
+        if (f.step) input.step = f.step;
+        input.name = f.key;
+        wrap.appendChild(lab);
+        wrap.appendChild(input);
+        addForm.appendChild(wrap);
+      });
+
+      const submit = document.createElement('button');
+      submit.className = 'btn';
+      submit.type = 'submit';
+      submit.textContent = 'Сохранить';
+      addForm.appendChild(submit);
+    }
+
+    async function onDelete(id){
+      if (!confirm(`Удалить запись #${id}?`)) return;
+      try{
+        const resp = await fetch(API.remove(id), { method:'DELETE' });
+        if (!resp.ok) throw new Error('Не удалось удалить');
+        await loadPayments();
+      }catch(e){
+        alert('Ошибка удаления');
+      }
+    }
+
+    addForm.addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const formData = new FormData(form);
+      const fd = new FormData(addForm);
       const body = {};
-      formData.forEach((v, k) => body[k] = v);
-      try {
-        const resp = await fetch('/payments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+      fd.forEach((v,k)=> body[k] = v);
+      // пустые строки не шлём
+      Object.keys(body).forEach(k => { if (String(body[k]).trim()==='') delete body[k]; });
+
+      try{
+        const resp = await fetch(API.create,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
           body: JSON.stringify(body)
         });
-        if (resp.ok) {
-          form.reset();
-          loadPayments();
-        } else {
-          alert('Ошибка при добавлении');
+        if (!resp.ok){
+          const t = await resp.text();
+          console.error(t);
+          alert('Ошибка сохранения');
+          return;
         }
-      } catch (err) {
+        addForm.reset();
+        await loadPayments();
+      }catch(e){
         alert('Ошибка сети');
       }
     });
 
+    // UI-переключатели
+    el('#addToggle').onclick = ()=>{
+      const shown = addFormWrap.style.display !== 'none';
+      addFormWrap.style.display = shown ? 'none' : '';
+    };
+    el('#refreshBtn').onclick = loadPayments;
+
+    // старт
     loadPayments();
   </script>
 </body>
