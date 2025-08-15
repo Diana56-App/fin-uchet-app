@@ -9,13 +9,19 @@ const bitrix = require('./bitrix');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// базовые миддлвары
+/* ===== Базовые мидлвары ===== */
 app.use(cors());
 app.use(bodyParser.json());
 
-// статика из backend/public (здесь лежат test.html, app.html и т.п. — пусть остаётся)
+/* Папка public (test.html, картинки и т.п.) */
 app.use(express.static(path.join(__dirname, 'public')));
 
+/* ПОДКЛЮЧАЕМ КРАСИВЫЙ ФРОНТ КАК СТАТИКУ
+   ВАЖНО: теперь всё красивое доступно по https://.../app/
+   (index.html подтянется сам) */
+app.use('/app', express.static(path.join(__dirname, 'frontend')));
+
+/* База */
 init()
   .then(() => console.log('DB init OK'))
   .catch((err) => { console.error('DB init error:', err); process.exit(1); });
@@ -27,7 +33,7 @@ const SELECT_FIELDS = `
   deal_name, contact_name, company_name, project_name
 `;
 
-/* ===================== Диагностика ===================== */
+/* ===== Диагностика ===== */
 app.get('/health', (req, res) => {
   res.json({ ok: true, ts: new Date().toISOString() });
 });
@@ -46,7 +52,7 @@ app.get('/version', (req, res) => {
   res.json({ version: '0.1.0' });
 });
 
-/* ===================== API: payments ===================== */
+/* ===== API payments ===== */
 app.get('/payments', async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -118,10 +124,12 @@ app.put('/payments/:id', async (req, res) => {
       article:        p.article ?? null,
       cashbox:        p.cashbox ?? null,
       comment:        p.comment ?? null,
+
       deal_id:        keep(p.deal_id,        cur.deal_id),
       contact_id:     keep(p.contact_id,     cur.contact_id),
       company_id:     keep(p.company_id,     cur.company_id),
       project_id:     keep(p.project_id,     cur.project_id),
+
       deal_name:      keep(p.deal_name,      cur.deal_name),
       contact_name:   keep(p.contact_name,   cur.contact_name),
       company_name:   keep(p.company_name,   cur.company_name),
@@ -167,7 +175,7 @@ app.delete('/payments/:id', async (req, res) => {
   }
 });
 
-/* ======== PATCH: ручная правка битрикс-полей ======== */
+/* ===== Bitrix patch ===== */
 app.patch('/payments/:id/link', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -199,7 +207,7 @@ app.patch('/payments/:id/link', async (req, res) => {
   }
 });
 
-/* ======== POST: автоподтяжка из Bitrix ======== */
+/* ===== Bitrix автоподтяжка ===== */
 app.post('/payments/:id/link/bitrix', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -273,18 +281,12 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
   }
 });
 
-/* ===================== UI для Битрикс ===================== */
-/* ОТДАЁМ КРАСИВЫЙ ИНТЕРФЕЙС: backend/frontend/index.html */
-app.get('/ui', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
-});
+/* ===== UI для Битрикс: ВСЕГДА на /app/ ===== */
+app.post('/install', (req, res) => res.redirect(302, '/app/'));
+app.get('/install',  (req, res) => res.redirect(302, '/app/'));
+app.get('/handler',  (req, res) => res.redirect(302, '/app/'));
 
-/* Точки входа Bitrix: ВСЕГДА ведём на /ui */
-app.post('/install', (req, res) => res.redirect(302, '/ui'));
-app.get('/install',  (req, res) => res.redirect(302, '/ui'));
-app.get('/handler',  (req, res) => res.redirect(302, '/ui'));
-
-/* ===================== START ===================== */
+/* ===== START ===== */
 app.listen(PORT, () => {
   console.log(`Server started at http://localhost:${PORT}`);
 });
