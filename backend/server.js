@@ -140,12 +140,15 @@ app.put('/payments/:id', async (req, res) => {
       final.date, final.amount, final.category, final.project, final.contractor,
       final.operation_type, final.article, final.cashbox, final.comment,
       final.deal_id, final.contact_id, final.company_id, final.project_id,
-      final.deal_name, final.contact_name, final_company = final.company_name, final.project_name,
+      final.deal_name, final.contact_name, final.company_name, final.project_name,
       id
     ];
+
+    const { rows } = await pool.query(sql, v);
+    res.json(rows[0]);
   } catch (e) {
     console.error('PUT /payments/:id error:', e);
-    return res.status(500).json({ error: 'Failed to update payment' });
+    res.status(500).json({ error: 'Failed to update payment' });
   }
 });
 
@@ -231,8 +234,11 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
       }
 
       if (sync_amount) {
-        const amt = Number(deal.OPPORTUNITY ?? deal.AMOUNT ?? deal.SUM ?? deal.BUDGET ?? 0);
-        if (Number.isFinite(amt) && amt !== 0) patch.amount = amt;
+        const amt =
+          Number(deal.OPPORTUNITY ?? deal.AMOUNT ?? deal.SUM ?? deal.BUDGET ?? 0);
+        if (Number.isFinite(amt) && amt !== 0) {
+          patch.amount = amt;
+        }
       }
     }
 
@@ -271,13 +277,10 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
 });
 
 // ---------------- Bitrix: точки входа ----------------
-// 1) /install — Bitrix дергает при установке (POST), а иногда и GET'ом.
-// В любом случае просто ведём пользователя в интерфейс приложения.
-app.post('/install', (req, res) => res.redirect(302, '/app.html'));
-app.get('/install',  (req, res) => res.redirect(302, '/app.html'));
-
-// 2) /handler — основная точка входа для iFrame. Ведём в интерфейс.
-app.get('/handler', (req, res) => res.redirect(302, '/app.html'));
+// ВАЖНО: теперь ведём в КРАСИВУЮ страницу /test.html
+app.post('/install', (req, res) => res.redirect(302, '/test.html'));
+app.get('/install',  (req, res) => res.redirect(302, '/test.html'));
+app.get('/handler',  (req, res) => res.redirect(302, '/test.html'));
 
 // ---------------- START ----------------
 app.listen(PORT, () => {
