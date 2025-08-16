@@ -100,7 +100,6 @@
         </div>
       </div>
 
-      <!-- Настройки/справочники -->
       <div class="settings" id="settingsPanel">
         <h4>Справочники (локально, в этом браузере)</h4>
         <div class="grid">
@@ -161,7 +160,7 @@
   <div class="modal-back" id="bitrixBack">
     <div class="modal">
       <h3>Связать с Битрикс</h3>
-      <div class="note" style="margin-bottom:8px">Введите <b>ID сделки</b>. Можно перезаписать сумму из сделки.</div>
+      <div class="note" style="margin-bottom:8px">Введите <b>ID сделки</b>. При необходимости можно <b>перезаписать сумму</b> из сделки.</div>
       <div class="form" style="grid-template-columns:1fr">
         <div class="field"><label>ID сделки</label><input id="dealIdInput" type="text" placeholder="например, 1234"></div>
         <label style="display:flex;gap:8px;align-items:center">
@@ -260,7 +259,7 @@
     const dealIdInput = $('#dealIdInput');
     const overwriteAmount = $('#overwriteAmount');
 
-    // ---- Settings (надёжный обработчик) ----
+    // ---- Settings ----
     document.addEventListener('DOMContentLoaded', ()=>{
       settingsBtn?.addEventListener('click', ()=>{
         const hidden = getComputedStyle(settingsPanel).display === 'none';
@@ -269,7 +268,6 @@
         tCashbox.value    = loadDict('cashbox').join('\n');
         tContractor.value = loadDict('contractor').join('\n');
         settingsPanel.style.display = hidden ? '' : 'none';
-        // обновим селекты формы
         fillSelect(selCategory,  loadDict('category'));
         fillSelect(selProject,   loadDict('project'));
         fillSelect(selCashbox,   loadDict('cashbox'));
@@ -330,7 +328,7 @@
       }catch{ alert('Ошибка сети'); }
     };
 
-    // ---- Bitrix link (модалка + галочка переписи суммы) ----
+    // ---- Bitrix link ----
     function openBitrix(id){ bitrixTargetId = id; dealIdInput.value=''; overwriteAmount.checked = false; bitrixBack.style.display='flex'; }
     bitrixCancel.onclick = ()=> bitrixBack.style.display='none';
     bitrixLink.onclick = async ()=>{
@@ -408,4 +406,119 @@
         // 1) Дата (+ бейдж "план")
         const tdDate = document.createElement('td');
         tdDate.textContent = fmtDate(row.date);
-        if (future){ const b=document.createElement('span'); b.className='badge'; b.textContent='план'; tdDate
+        if (future){ const b=document.createElement('span'); b.className='badge'; b.textContent='план'; tdDate.appendChild(b); }
+        tr.appendChild(tdDate);
+
+        // 2) Операция
+        const tdOp = document.createElement('td');
+        tdOp.textContent = (amt>=0?'+ ':'- ') + fmtMoney(Math.abs(amt)).replace(' ₽','');
+        tdOp.className = 'op ' + (amt>=0?'plus':'minus');
+        tr.appendChild(tdOp);
+
+        // 3) Статья
+        const tdCat = document.createElement('td');
+        tdCat.textContent = row.category || '';
+        tr.appendChild(tdCat);
+
+        // 4) Счёт
+        const tdCash = document.createElement('td');
+        tdCash.textContent = row.cashbox || '';
+        tr.appendChild(tdCash);
+
+        // 5) Контрагент (компания/контакт/сотрудник)
+        const tdContr = document.createElement('td');
+        tdContr.textContent = row.company_name || row.contact_name || '';
+        tr.appendChild(tdContr);
+
+        // 6) Сделка
+        const tdDeal = document.createElement('td');
+        if (row.bitrix_title) {
+          tdDeal.textContent = row.bitrix_title;
+        } else if (row.bitrix_deal_id) {
+          tdDeal.textContent = `Сделка #${row.bitrix_deal_id}`;
+        } else if (row.comment) {
+          tdDeal.textContent = row.comment;
+        } else {
+          const a=document.createElement('span'); a.className='link'; a.textContent='Связать…';
+          a.onclick=()=>openBitrix(row.id); tdDeal.appendChild(a);
+        }
+        tr.appendChild(tdDeal);
+
+        // 7) Проект
+        const tdProj = document.createElement('td');
+        tdProj.textContent = row.project || '';
+        tr.appendChild(tdProj);
+
+        // 8) Действия
+        const tdAct = document.createElement('td'); tdAct.className='actions';
+        // edit
+        const btnEdit=document.createElement('button'); btnEdit.className='iconbtn'; btnEdit.title='Редактировать'; btnEdit.textContent='✏️';
+        btnEdit.onclick=()=>{
+          editingId = row.id;
+          formTitle.textContent = 'Редактирование';
+          editForm.reset();
+          fillSelect(selCategory,  loadDict('category'));
+          fillSelect(selProject,   loadDict('project'));
+          fillSelect(selCashbox,   loadDict('cashbox'));
+          fillSelect(selContractor,loadDict('contractor'));
+          editForm.elements['date'].value = toISO(row.date)||new Date().toISOString().slice(0,10);
+          editForm.elements['amount'].value = row.amount ?? 0;
+          editForm.elements['category'].value = row.category || '';
+          editForm.elements['cashbox'].value = row.cashbox || '';
+          editForm.elements['company_name'].value = row.company_name || '';
+          editForm.elements['project'].value = row.project || '';
+          editForm.elements['comment'].value = row.comment || '';
+          formBack.style.display='flex';
+        };
+        tdAct.appendChild(btnEdit);
+        // link bitrix
+        const btnLink=document.createElement('button'); btnLink.className='iconbtn'; btnLink.title='Связать с Битрикс'; btnLink.textContent='🔗';
+        btnLink.onclick=()=>openBitrix(row.id);
+        tdAct.appendChild(btnLink);
+        // delete
+        const btnDel=document.createElement('button'); btnDel.className='iconbtn'; btnDel.title='Удалить'; btnDel.textContent='🗑️';
+        btnDel.onclick=async()=>{
+          if(!confirm('Удалить запись?')) return;
+          const r = await fetch(API.remove(row.id),{method:'DELETE'});
+          if (!r.ok){ alert('Удалить не удалось'); return; }
+          await load();
+        };
+        tdAct.appendChild(btnDel);
+
+        tr.appendChild(tdAct);
+
+        if (amt>0) sumIn += amt; else sumOut += Math.abs(amt);
+        tbody.appendChild(tr);
+      });
+
+      countEl.textContent = String(filtered.length);
+      sumInEl.textContent = fmtMoney(sumIn);
+      sumOutEl.textContent = fmtMoney(sumOut);
+      sumBalEl.textContent = fmtMoney(sumIn - sumOut);
+    }
+
+    function render(){
+      applyFilters();
+      renderTable();
+    }
+
+    // ---- Load ----
+    async function load(){
+      try{
+        const r = await fetch(API.list);
+        if(!r.ok){ throw new Error(await r.text()); }
+        const data = await r.json();
+        all = Array.isArray(data)? data : [];
+        buildCashFilter();
+        render();
+      }catch(e){
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="8">Ошибка загрузки</td></tr>';
+      }
+    }
+
+    // старт
+    load();
+  </script>
+</body>
+</html>
