@@ -1,5 +1,7 @@
 // backend/server.js
-// Express-сервер: API + фронт с корня "/" + редиректы Bitrix. API не меняем.
+// Express-сервер: API + фронт с корня "/" + редиректы Bitrix. API как в ТЗ.
+// Добавлено улучшение: /payments/:id/link/bitrix подтягивает deal/company/contact
+// и кастомное поле проекта (если задано в .env: BITRIX_DEAL_PROJECT_FIELD).
 
 require('dotenv').config();
 
@@ -81,7 +83,7 @@ app.get('/dbcheck', async (_req, res) => {
 });
 app.get('/version', (_req, res) => res.json({ version: '0.1.0' }));
 
-// API /payments - без изменений
+// API /payments - как в ТЗ
 app.get('/payments', async (_req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -148,34 +150,75 @@ app.patch('/payments/:id/link', async (req, res) => {
   }
 });
 
-// Подтяжка из Bitrix
+// Подтяжка из Bitrix (улучшенная)
 app.post('/payments/:id/link/bitrix', async (req, res) => {
   const { id } = req.params;
   const { dealId } = req.body || {};
   const hook = process.env.BITRIX_WEBHOOK_URL;
+  const projectField = process.env.BITRIX_DEAL_PROJECT_FIELD; // например UF_CRM_XXXX
+
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
     if (!hook || !dealId) {
       return res.status(400).json({ error: 'BITRIX_WEBHOOK_URL or dealId missing' });
     }
 
+    // 1) Сделка
     const dealResp = await axios.get(`${hook}/crm.deal.get`, {
       params: { id: dealId },
       timeout: 15000,
     });
-
     const deal = dealResp?.data?.result || {};
+
+    // 2) Компания
+    let companyTitle = '';
+    if (deal.COMPANY_ID) {
+      try {
+        const comp = await axios.get(`${hook}/crm.company.get`, {
+          params: { id: deal.COMPANY_ID },
+          timeout: 15000,
+        });
+        companyTitle = comp?.data?.result?.TITLE || '';
+      } catch {}
+    }
+
+    // 3) Контакт
+    let contactTitle = '';
+    if (deal.CONTACT_ID) {
+      try {
+        const cont = await axios.get(`${hook}/crm.contact.get`, {
+          params: { id: deal.CONTACT_ID },
+          timeout: 15000,
+        });
+        const c = cont?.data?.result || {};
+        contactTitle = [c.LAST_NAME, c.NAME, c.SECOND_NAME].filter(Boolean).join(' ').trim();
+      } catch {}
+    }
+
+    // 4) Какие поля реально есть в нашей таблице
     const cols = await getTableColumns('payments');
 
     const patch = {};
     if (cols.includes('bitrix_deal_id')) patch.bitrix_deal_id = dealId;
     if (cols.includes('bitrix_title') && deal.TITLE) patch.bitrix_title = deal.TITLE;
-    if (cols.includes('bitrix_contact_id') && deal.CONTACT_ID) patch.bitrix_contact_id = deal.CONTACT_ID;
-    if (cols.includes('bitrix_company_id') && deal.COMPANY_ID) patch.bitrix_company_id = deal.COMPANY_ID;
     if (cols.includes('bitrix_stage_id') && deal.STAGE_ID) patch.bitrix_stage_id = deal.STAGE_ID;
     if (cols.includes('bitrix_amount') && deal.OPPORTUNITY) patch.bitrix_amount = deal.OPPORTUNITY;
 
+    // проект из кастомного поля сделки
+    if (projectField && cols.includes('project') && deal[projectField]) {
+      patch.project = String(deal[projectField]).trim();
+    }
+
+    // компания
+    if (cols.includes('company_id') && deal.COMPANY_ID) patch.company_id = deal.COMPANY_ID;
+    if (cols.includes('company_name') && companyTitle) patch.company_name = companyTitle;
+
+    // контакт
+    if (cols.includes('contact_id') && deal.CONTACT_ID) patch.contact_id = deal.CONTACT_ID;
+    if (cols.includes('contact_name') && contactTitle) patch.contact_name = contactTitle;
+
     if (Object.keys(patch).length === 0) {
+      // обновлять нечего — вернём сделку, чтобы фронт хотя бы показал "Сделка #id"
       return res.status(200).json({ ok: true, note: 'No matching columns to update', deal });
     }
 
@@ -192,46 +235,12 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
 const FRONTEND_DIR = path.join(__dirname, 'frontend');
 const INDEX_HTML = path.join(FRONTEND_DIR, 'index.html');
 
-// Статика: отключаем кэш для index.html, для остального — обычный cache-control
-app.use(express.static(FRONTEND_DIR, {
-  index: 'index.html',
-  extensions: ['html'],
-  setHeaders: (res, filePath) => {
-    if (path.basename(filePath) === 'index.html') {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      res.setHeader('Surrogate-Control', 'no-store');
-    } else {
-      res.setHeader('Cache-Control', 'public, max-age=300');
-    }
-  }
-}));
+app.use(express.static(FRONTEND_DIR, { index: 'index.html', extensions: ['html'] }));
+app.use('/app', express.static(FRONTEND_DIR, { index: 'index.html', extensions: ['html'] }));
 
-app.use('/app', express.static(FRONTEND_DIR, {
-  index: 'index.html',
-  extensions: ['html'],
-  setHeaders: (res, filePath) => {
-    if (path.basename(filePath) === 'index.html') {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      res.setHeader('Surrogate-Control', 'no-store');
-    } else {
-      res.setHeader('Cache-Control', 'public, max-age=300');
-    }
-  }
-}));
-
-// Корень и SPA-фолбэк: тоже no-store для index.html
+// Корень и SPA-фолбэк
 app.get('/', (_req, res) => {
-  if (fs.existsSync(INDEX_HTML)) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    return res.sendFile(INDEX_HTML);
-  }
+  if (fs.existsSync(INDEX_HTML)) return res.sendFile(INDEX_HTML);
   return res.status(500).send('index.html not found in frontend/');
 });
 
@@ -244,13 +253,7 @@ app.get('/handler', (_req, res) => res.redirect(302, '/'));
 app.get('*', (req, res, next) => {
   const knownApi = [/^\/payments(\/.*)?$/, /^\/health$/, /^\/dbcheck$/, /^\/version$/];
   if (knownApi.some(rx => rx.test(req.path))) return next();
-  if (fs.existsSync(INDEX_HTML)) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    return res.sendFile(INDEX_HTML);
-  }
+  if (fs.existsSync(INDEX_HTML)) return res.sendFile(INDEX_HTML);
   return res.status(404).send('Not found');
 });
 

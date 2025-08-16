@@ -48,7 +48,7 @@
       select,input[type="date"]{width:100%}
     }
 
-    /* Модалка */
+    /* Модалки */
     .modal-back{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;z-index:1000}
     .modal{background:#fff;border-radius:14px;min-width:320px;max-width:700px;width:90%;padding:16px;box-shadow:0 20px 60px #00000040}
     .modal h3{margin:0 0 10px 0;color:#111827}
@@ -101,6 +101,7 @@
         </div>
       </div>
 
+      <!-- Панель настроек (локальные справочники) -->
       <div class="settings" id="settingsPanel">
         <h4>Справочники (локально, в этом браузере)</h4>
         <div class="grid">
@@ -161,9 +162,7 @@
   <div class="modal-back" id="bitrixBack">
     <div class="modal">
       <h3>Связать с Битрикс</h3>
-      <div class="note" style="margin-bottom:8px">
-        Введите <b>ID сделки</b>. (Поиск по названию подключим следующим шагом.)
-      </div>
+      <div class="note" style="margin-bottom:8px">Введите <b>ID сделки</b>. (Поиск по названию подключим следующим шагом.)</div>
       <div class="field"><label>ID сделки</label><input id="dealIdInput" type="text" placeholder="например, 1234"></div>
       <div class="footer">
         <button id="bitrixCancel" class="btn secondary">Отмена</button>
@@ -208,8 +207,6 @@
       d.setHours(0,0,0,0);
       return d.getTime() > today.getTime();
     };
-
-    // --- dicts in localStorage ---
     function loadDict(k){ try{ return JSON.parse(localStorage.getItem('dict_'+k) || '[]'); }catch{ return []; } }
     function saveDict(k,arr){ localStorage.setItem('dict_'+k, JSON.stringify(arr)); }
     function fillSelect(select, arr, allowEmpty=true){
@@ -219,13 +216,12 @@
       });
     }
 
-    // --- state ---
+    // --- state & refs ---
     let all = [];
     let filtered = [];
-    let editingId = null; // null -> create, number -> edit
+    let editingId = null;
     let bitrixTargetId = null;
 
-    // --- refs ---
     const tbody = el('#tbody');
     const countEl = el('#count');
     const sumInEl = el('#sumIn');
@@ -245,7 +241,6 @@
     const tContractor = el('#dictContractor');
     const saveDictsBtn = el('#saveDicts');
 
-    // modal refs
     const formBack = el('#formBack');
     const formTitle = el('#formTitle');
     const editForm = el('#editForm');
@@ -261,10 +256,9 @@
     const bitrixLink = el('#bitrixLink');
     const dealIdInput = el('#dealIdInput');
 
-    // --- UI actions ---
+    // --- Settings panel ---
     settingsBtn.onclick = () => {
       const hiddenNow = getComputedStyle(settingsPanel).display === 'none';
-      // наполнить текущими справочниками
       const cat  = loadDict('category');
       const proj = loadDict('project');
       const cash = loadDict('cashbox');
@@ -274,7 +268,7 @@
       tCashbox.value    = cash.join('\n');
       tContractor.value = cont.join('\n');
       settingsPanel.style.display = hiddenNow ? '' : 'none';
-      // обновим селекты формы
+      // обновим селекты формы, чтобы новые значения были под рукой
       fillSelect(selCategory,  cat);
       fillSelect(selProject,   proj);
       fillSelect(selCashbox,   cash);
@@ -282,44 +276,42 @@
     };
 
     saveDictsBtn.onclick = ()=>{
-      const norm = s => s.split('\n').map(x=>x.trim()).filter(Boolean);
+      const norm = s => String(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
       saveDict('category',  norm(tCategory.value));
       saveDict('project',   norm(tProject.value));
       saveDict('cashbox',   norm(tCashbox.value));
       saveDict('contractor',norm(tContractor.value));
       alert('Справочники сохранены');
       settingsPanel.style.display='none';
-      // обновим селекты
       fillSelect(selCategory,  loadDict('category'));
       fillSelect(selProject,   loadDict('project'));
       fillSelect(selCashbox,   loadDict('cashbox'));
       fillSelect(selContractor,loadDict('contractor'));
     };
 
+    // --- filters ---
     opFilter.onchange = render;
     cashFilter.onchange = render;
     dateFrom.onchange = render;
     dateTo.onchange = render;
-
     resetBtn.onclick = ()=>{
       opFilter.value='all'; cashFilter.value='all'; dateFrom.value=''; dateTo.value='';
       render();
     };
 
+    // --- Add/Edit ---
     addBtn.onclick = ()=>{
       editingId = null;
       formTitle.textContent = 'Новая операция';
       editForm.reset();
       editForm.elements['date'].value = new Date().toISOString().slice(0,10);
-      // обновим селекты из dicts
       fillSelect(selCategory,  loadDict('category'));
       fillSelect(selProject,   loadDict('project'));
       fillSelect(selCashbox,   loadDict('cashbox'));
       fillSelect(selContractor,loadDict('contractor'));
-      openForm();
+      formBack.style.display='flex';
     };
-
-    formCancel.onclick = ()=>closeForm();
+    formCancel.onclick = ()=> formBack.style.display='none';
     formSave.onclick = async ()=>{
       const fd = new FormData(editForm);
       const obj = {}; fd.forEach((v,k)=>{ if(String(v).trim()!=='') obj[k]=v; });
@@ -332,19 +324,14 @@
           r = await fetch(API.update(editingId),{ method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(obj) });
         }
         if (!r.ok){ const t=await r.text(); console.error(t); alert('Сохранить не удалось'); return; }
-        closeForm(); await load();
+        formBack.style.display='none'; await load();
       }catch{ alert('Ошибка сети'); }
     };
 
-    function openForm(){ formBack.style.display='flex'; }
-    function closeForm(){ formBack.style.display='none'; }
-
-    function openBitrix(id){
-      bitrixTargetId = id;
-      dealIdInput.value = '';
-      bitrixBack.style.display='flex';
-    }
+    // --- Bitrix modal ---
+    function openBitrix(id){ bitrixTargetId = id; dealIdInput.value=''; bitrixBack.style.display='flex'; }
     bitrixCancel.onclick = ()=> bitrixBack.style.display='none';
+
     bitrixLink.onclick = async ()=>{
       const dealId = dealIdInput.value.trim();
       if (!dealId) { alert('Введите ID сделки'); return; }
@@ -354,10 +341,27 @@
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ dealId })
         });
-        if (!r.ok){ const t=await r.text(); console.error(t); alert('Ошибка связи с Битрикс'); return; }
+        const data = await r.json().catch(()=>null);
+
+        if (!r.ok){
+          const msg = (data && (data.error || data.message)) || 'Ошибка связи с Битрикс';
+          console.error('Bitrix link error:', data || await r.text());
+          alert(msg);
+          return;
+        }
+
+        // Если сервер прислал обновлённую строку — обновим локально
+        if (data && data.updated) {
+          const idx = all.findIndex(x=>String(x.id)===String(data.updated.id));
+          if (idx>=0) all[idx] = data.updated;
+        }
+
         bitrixBack.style.display='none';
         await load();
-      }catch{ alert('Ошибка сети'); }
+      }catch(e){
+        console.error(e);
+        alert('Ошибка сети');
+      }
     };
 
     // --- table render ---
@@ -404,7 +408,6 @@
       filtered.forEach(row=>{
         const tr = document.createElement('tr');
 
-        // классы для будущего и типа
         const future = isFuture(row.date);
         const amt = Number(row.amount||0);
         if (future) tr.classList.add('future', amt>=0 ? 'income' : 'expense');
@@ -429,9 +432,11 @@
         tdArt.textContent = row.category || row.comment || row.article || '';
         tr.appendChild(tdArt);
 
-        // сделка (клик для связи с Битрикс)
+        // сделка (покажем title или хотя бы "Сделка #ID")
         const tdDeal = document.createElement('td');
-        tdDeal.innerHTML = row.bitrix_title ? row.bitrix_title : '<span class="link">Связать…</span>';
+        const dealTitle = row.bitrix_title || (row.bitrix_deal_id ? `Сделка #${row.bitrix_deal_id}` : '');
+        if (dealTitle) tdDeal.textContent = dealTitle;
+        else tdDeal.innerHTML = '<span class="link">Связать…</span>';
         tdDeal.style.cursor='pointer';
         tdDeal.onclick = ()=> openBitrix(row.id);
         tr.appendChild(tdDeal);
@@ -439,8 +444,8 @@
         // проект
         const tdProj = document.createElement('td'); tdProj.textContent = row.project || ''; tr.appendChild(tdProj);
 
-        // контрагент (компании/клиенты/сотрудники — просто строка)
-        const tdContr = document.createElement('td'); tdContr.textContent = row.company_name || ''; tr.appendChild(tdContr);
+        // контрагент (компания/клиент/сотрудник)
+        const tdContr = document.createElement('td'); tdContr.textContent = row.company_name || row.contact_name || ''; tr.appendChild(tdContr);
 
         // касса
         const tdCash = document.createElement('td'); tdCash.textContent = row.cashbox || ''; tr.appendChild(tdCash);
@@ -462,10 +467,7 @@
       sumBalEl.textContent = fmtMoney(sumIn - sumOut);
     }
 
-    function render(){
-      applyFilters();
-      renderTable();
-    }
+    function render(){ applyFilters(); renderTable(); }
 
     // CRUD
     async function onDelete(id){
@@ -481,12 +483,10 @@
       editingId = row.id;
       formTitle.textContent = 'Редактирование #' + row.id;
       editForm.reset();
-      // актуальные dicts
       fillSelect(selCategory,  loadDict('category'));
       fillSelect(selProject,   loadDict('project'));
       fillSelect(selCashbox,   loadDict('cashbox'));
       fillSelect(selContractor,loadDict('contractor'));
-      // значения
       editForm.elements['date'].value = row.date ? toISO(row.date) : '';
       editForm.elements['amount'].value = row.amount ?? '';
       editForm.elements['category'].value = row.category ?? '';
@@ -494,7 +494,7 @@
       editForm.elements['company_name'].value = row.company_name ?? '';
       editForm.elements['cashbox'].value = row.cashbox ?? '';
       editForm.elements['comment'].value = row.comment ?? '';
-      openForm();
+      formBack.style.display='flex';
     }
 
     // загрузка
@@ -515,96 +515,5 @@
     // init
     load();
   </script>
-<!-- ==== FIX: надёжный переключатель панели "Настройки" ==== -->
-<style>
-  /* на случай, если в стилях нет класса .settings */
-  .settings{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:12px 24px;background:#fff}
-  .settings h4{margin:0 0 8px 0}
-  .settings .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-  .settings textarea{width:100%;min-height:80px;border:1px solid #e5e7eb;border-radius:10px;padding:8px}
-  @media (max-width:900px){ .settings .grid{grid-template-columns:1fr} }
-</style>
-
-<script>
-  (function setupSettingsPanel(){
-    // 1) Находим кнопку
-    const btn = document.getElementById('settingsBtn');
-    if (!btn) return; // если по какой-то причине кнопки нет — выходим тихо
-
-    // 2) Ищем/создаём панель
-    let panel = document.getElementById('settingsPanel');
-    if (!panel) {
-      panel = document.createElement('div');
-      panel.id = 'settingsPanel';
-      panel.className = 'settings';
-      panel.style.display = 'none';
-      panel.innerHTML = `
-        <h4>Справочники</h4>
-        <div class="grid">
-          <div><div class="note">Статьи</div><textarea id="dictCategory" placeholder="каждая с новой строки"></textarea></div>
-          <div><div class="note">Проекты</div><textarea id="dictProject" placeholder="каждая с новой строки"></textarea></div>
-          <div><div class="note">Кассы/Счета</div><textarea id="dictCashbox" placeholder="каждая с новой строки"></textarea></div>
-          <div><div class="note">Контрагенты (компании/клиенты/сотрудники)</div><textarea id="dictContractor" placeholder="каждый с новой строки"></textarea></div>
-        </div>
-        <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
-          <button id="saveDicts" class="btn">Сохранить</button>
-          <span class="note">Данные сохраняются в localStorage.</span>
-        </div>
-      `;
-      // Вставляем панель сразу после блока с фильтрами/таблицей-оберткой (или в конец контейнера)
-      const container = document.querySelector('.box') || document.querySelector('.container') || document.body;
-      container.appendChild(panel);
-    }
-
-    // 3) Хелперы для локальных справочников
-    const loadDict = k => { try{ return JSON.parse(localStorage.getItem('dict_'+k) || '[]'); }catch{ return []; } };
-    const saveDict = (k,arr) => localStorage.setItem('dict_'+k, JSON.stringify(arr));
-    const norm = s => String(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
-
-    // 4) При открытии панели — заполняем текущими значениями
-    function fillTextareas(){
-      const tCategory   = document.getElementById('dictCategory');
-      const tProject    = document.getElementById('dictProject');
-      const tCashbox    = document.getElementById('dictCashbox');
-      const tContractor = document.getElementById('dictContractor');
-      if (!tCategory) return; // если панель ещё не дорендерилась — просто выходим
-      tCategory.value   = loadDict('category').join('\n');
-      tProject.value    = loadDict('project').join('\n');
-      tCashbox.value    = loadDict('cashbox').join('\n');
-      tContractor.value = loadDict('contractor').join('\n');
-    }
-
-    // 5) Кнопка «Сохранить»
-    function bindSave(){
-      const saveBtn = document.getElementById('saveDicts');
-      if (!saveBtn) return;
-      saveBtn.onclick = () => {
-        const tCategory   = document.getElementById('dictCategory');
-        const tProject    = document.getElementById('dictProject');
-        const tCashbox    = document.getElementById('dictCashbox');
-        const tContractor = document.getElementById('dictContractor');
-        saveDict('category',   norm(tCategory.value));
-        saveDict('project',    norm(tProject.value));
-        saveDict('cashbox',    norm(tCashbox.value));
-        saveDict('contractor', norm(tContractor.value));
-        alert('Справочники сохранены');
-        panel.style.display = 'none';
-      };
-    }
-
-    // 6) Переключатель — гарантированно работает
-    btn.addEventListener('click', () => {
-      const hidden = panel.style.display === 'none' || getComputedStyle(panel).display === 'none';
-      if (hidden) {
-        fillTextareas();
-        panel.style.display = 'block';
-        bindSave();
-      } else {
-        panel.style.display = 'none';
-      }
-    });
-  })();
-</script>
-<!-- ==== /FIX ==== -->
 </body>
 </html>
