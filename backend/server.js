@@ -1,7 +1,5 @@
 // backend/server.js
-// Express-сервер: API + фронт с корня "/" + редиректы Bitrix. API как в ТЗ.
-// Добавлено улучшение: /payments/:id/link/bitrix подтягивает deal/company/contact
-// и кастомное поле проекта (если задано в .env: BITRIX_DEAL_PROJECT_FIELD).
+// Express API + выдача фронта. Подтяжка из Битрикс: deal/company/contact + опционально проект и сумма.
 
 require('dotenv').config();
 
@@ -17,7 +15,6 @@ const axios = require('axios');
 
 const app = express();
 
-// База middlewares
 app.set('trust proxy', 1);
 app.use(compression());
 app.use(morgan('tiny'));
@@ -31,19 +28,19 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const pool = DATABASE_URL
   ? new Pool({
       connectionString: DATABASE_URL,
-      ssl: { rejectUnauthorized: false }, // Render Postgres 17
+      ssl: { rejectUnauthorized: false }, // Render PG
     })
   : null;
 
-// Утилиты для универсальных INSERT/UPDATE
+// ------- SQL helpers -------
 async function getTableColumns(table) {
   const key = `__cols_${table}`;
   if (!pool) return [];
   if (!app.get(key)) {
     const { rows } = await pool.query(
       `SELECT column_name
-         FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=$1`,
+       FROM information_schema.columns
+       WHERE table_schema='public' AND table_name=$1`,
       [table]
     );
     app.set(key, rows.map(r => r.column_name));
@@ -70,7 +67,7 @@ function buildUpdate(table, body, cols, idParamName = 'id', idValue) {
   return { sql, values };
 }
 
-// Тех-маршруты
+// ------- Tech routes -------
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/dbcheck', async (_req, res) => {
   try {
@@ -83,7 +80,7 @@ app.get('/dbcheck', async (_req, res) => {
 });
 app.get('/version', (_req, res) => res.json({ version: '0.1.0' }));
 
-// API /payments - как в ТЗ
+// ------- Payments API (как в ТЗ) -------
 app.get('/payments', async (_req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -134,7 +131,7 @@ app.delete('/payments/:id', async (req, res) => {
   }
 });
 
-// Ручная правка битрикс-полей
+// Ручная правка любых полей (PATCH /payments/:id/link)
 app.patch('/payments/:id/link', async (req, res) => {
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -150,12 +147,12 @@ app.patch('/payments/:id/link', async (req, res) => {
   }
 });
 
-// Подтяжка из Bitrix (улучшенная)
+// ------- Link with Bitrix -------
 app.post('/payments/:id/link/bitrix', async (req, res) => {
   const { id } = req.params;
-  const { dealId } = req.body || {};
+  const { dealId, overwriteAmount } = req.body || {};
   const hook = process.env.BITRIX_WEBHOOK_URL;
-  const projectField = process.env.BITRIX_DEAL_PROJECT_FIELD; // например UF_CRM_XXXX
+  const projectField = process.env.BITRIX_DEAL_PROJECT_FIELD; // например UF_CRM_xxx
 
   try {
     if (!pool) return res.status(500).json({ error: 'DB not configured' });
@@ -195,61 +192,64 @@ app.post('/payments/:id/link/bitrix', async (req, res) => {
       } catch {}
     }
 
-    // 4) Какие поля реально есть в нашей таблице
+    // 4) Готовим патч только по реально существующим колонкам
     const cols = await getTableColumns('payments');
-
     const patch = {};
+
     if (cols.includes('bitrix_deal_id')) patch.bitrix_deal_id = dealId;
     if (cols.includes('bitrix_title') && deal.TITLE) patch.bitrix_title = deal.TITLE;
     if (cols.includes('bitrix_stage_id') && deal.STAGE_ID) patch.bitrix_stage_id = deal.STAGE_ID;
-    if (cols.includes('bitrix_amount') && deal.OPPORTUNITY) patch.bitrix_amount = deal.OPPORTUNITY;
+    if (cols.includes('bitrix_amount') && deal.OPPORTUNITY) patch.bitrix_amount = Number(deal.OPPORTUNITY);
 
-    // проект из кастомного поля сделки
+    // Проект из кастомного поля сделки
     if (projectField && cols.includes('project') && deal[projectField]) {
       patch.project = String(deal[projectField]).trim();
     }
 
-    // компания
+    // Контрагент
     if (cols.includes('company_id') && deal.COMPANY_ID) patch.company_id = deal.COMPANY_ID;
     if (cols.includes('company_name') && companyTitle) patch.company_name = companyTitle;
-
-    // контакт
     if (cols.includes('contact_id') && deal.CONTACT_ID) patch.contact_id = deal.CONTACT_ID;
     if (cols.includes('contact_name') && contactTitle) patch.contact_name = contactTitle;
 
+    // Перезаписать сумму из сделки (по галочке)
+    if (overwriteAmount && cols.includes('amount') && deal.OPPORTUNITY) {
+      patch.amount = Number(deal.OPPORTUNITY);
+    }
+
+    // Если нечего писать — вернём сделку для фронта (чтобы хотя бы показать "Сделка #id")
     if (Object.keys(patch).length === 0) {
-      // обновлять нечего — вернём сделку, чтобы фронт хотя бы показал "Сделка #id"
       return res.status(200).json({ ok: true, note: 'No matching columns to update', deal });
     }
 
     const built = buildUpdate('payments', patch, cols, 'id', id);
     const { rows } = await pool.query(built.sql, built.values);
     if (!rows[0]) return res.status(404).json({ error: 'Payment not found' });
+
     res.json({ ok: true, updated: rows[0], deal });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Раздача фронта: корень "/" + дубликат "/app"
+// ------- Static frontend -------
 const FRONTEND_DIR = path.join(__dirname, 'frontend');
 const INDEX_HTML = path.join(FRONTEND_DIR, 'index.html');
 
 app.use(express.static(FRONTEND_DIR, { index: 'index.html', extensions: ['html'] }));
 app.use('/app', express.static(FRONTEND_DIR, { index: 'index.html', extensions: ['html'] }));
 
-// Корень и SPA-фолбэк
 app.get('/', (_req, res) => {
   if (fs.existsSync(INDEX_HTML)) return res.sendFile(INDEX_HTML);
   return res.status(500).send('index.html not found in frontend/');
 });
 
-// Редиректы Bitrix
+// Bitrix redirects
 app.get('/install', (_req, res) => res.redirect(302, '/'));
 app.post('/install', (_req, res) => res.redirect(302, '/'));
 app.get('/handler', (_req, res) => res.redirect(302, '/'));
 
-// SPA-фолбэк кроме API
+// SPA fallback (кроме API/health)
 app.get('*', (req, res, next) => {
   const knownApi = [/^\/payments(\/.*)?$/, /^\/health$/, /^\/dbcheck$/, /^\/version$/];
   if (knownApi.some(rx => rx.test(req.path))) return next();
