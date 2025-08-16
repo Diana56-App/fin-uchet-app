@@ -26,6 +26,7 @@
     .muted{color:var(--muted);font-size:.9rem}
     .summary{display:flex;gap:16px;align-items:center;font-weight:700}
     .summary .in{color:var(--green)} .summary .out{color:var(--red)} .summary .bal{color:#111827}
+
     .table-wrap{margin-top:12px;border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:70vh;background:#fff}
     table{width:100%;min-width:980px;border-collapse:separate;border-spacing:0}
     thead th{position:sticky;top:0;background:var(--thead);color:var(--brand);text-align:left;font-weight:700;padding:10px;border-bottom:1px solid #f2c6df;z-index:1}
@@ -40,6 +41,7 @@
     .actions{display:flex;gap:8px}
     .iconbtn{border:1px solid var(--border);background:#fff;border-radius:10px;padding:6px 8px;cursor:pointer}
     .iconbtn:hover{background:#f9fafb}
+    .link{color:var(--brand);cursor:pointer;text-decoration:underline}
     @media (max-width:720px){
       header{flex-direction:column;align-items:flex-start}
       .table-wrap{max-height:60vh}
@@ -55,8 +57,9 @@
     .form input,.form select,.form textarea{padding:10px;border:1px solid var(--border);border-radius:10px}
     .form textarea{grid-column:1/-1;min-height:60px}
     .modal .footer{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
-    .link{color:var(--brand);cursor:pointer;text-decoration:underline}
     .note{font-size:.9rem;color:var(--muted)}
+
+    /* Настройки/справочники */
     .settings{display:none;margin-top:10px;border:1px solid var(--border);border-radius:12px;padding:12px}
     .settings h4{margin:0 0 8px 0}
     .settings .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
@@ -87,7 +90,6 @@
           <option value="all">Все кассы</option>
         </select>
 
-        <!-- фильтр по дате -->
         <input type="date" id="dateFrom" />
         <input type="date" id="dateTo" />
         <button id="resetBtn" class="btn secondary">Сбросить фильтры</button>
@@ -109,7 +111,7 @@
         </div>
         <div class="row" style="margin-top:10px">
           <button id="saveDicts" class="btn">Сохранить</button>
-          <span class="note">Сохраняется в localStorage. Для сервера сделаем позже отдельную конфигурацию.</span>
+          <span class="note">Данные сохраняются в localStorage. Позже можно вынести в настройки сервера.</span>
         </div>
       </div>
 
@@ -160,7 +162,7 @@
     <div class="modal">
       <h3>Связать с Битрикс</h3>
       <div class="note" style="margin-bottom:8px">
-        Здесь временно вводим <b>ID сделки</b>. Поиск по названию подключим следующим шагом.
+        Введите <b>ID сделки</b>. (Поиск по названию подключим следующим шагом.)
       </div>
       <div class="field"><label>ID сделки</label><input id="dealIdInput" type="text" placeholder="например, 1234"></div>
       <div class="footer">
@@ -197,10 +199,7 @@
       const yy = d.getFullYear();
       return `${dd}.${mm}.${yy}`;
     };
-    const toISO = s => { // yyyy-mm-dd -> iso
-      if (!s) return null;
-      try{ return new Date(s).toISOString().slice(0,10); }catch{ return null; }
-    };
+    const toISO = s => { try{ return s ? new Date(s).toISOString().slice(0,10) : ''; }catch{ return ''; } };
     const isFuture = s => {
       if (!s) return false;
       const d = new Date(s);
@@ -211,7 +210,6 @@
     };
 
     // --- dicts in localStorage ---
-    const DICT_KEYS = ['category','project','cashbox','contractor'];
     function loadDict(k){ try{ return JSON.parse(localStorage.getItem('dict_'+k) || '[]'); }catch{ return []; } }
     function saveDict(k,arr){ localStorage.setItem('dict_'+k, JSON.stringify(arr)); }
     function fillSelect(select, arr, allowEmpty=true){
@@ -240,7 +238,6 @@
     const resetBtn = el('#resetBtn');
     const addBtn = el('#addBtn');
     const settingsBtn = el('#settingsBtn');
-
     const settingsPanel = el('#settingsPanel');
     const tCategory = el('#dictCategory');
     const tProject = el('#dictProject');
@@ -265,23 +262,38 @@
     const dealIdInput = el('#dealIdInput');
 
     // --- UI actions ---
-    settingsBtn.onclick = ()=>{
-      const cat = loadDict('category'); const proj = loadDict('project'); const cash = loadDict('cashbox'); const cont = loadDict('contractor');
-      tCategory.value = cat.join('\n'); tProject.value = proj.join('\n'); tCashbox.value = cash.join('\n'); tContractor.value = cont.join('\n');
-      settingsPanel.style.display = settingsPanel.style.display==='none' ? '' : 'none';
-      // обновим селекты
-      fillSelect(selCategory, cat);
-      fillSelect(selProject, proj);
-      fillSelect(selCashbox, cash);
-      fillSelect(selContractor, cont);
+    settingsBtn.onclick = () => {
+      const hiddenNow = getComputedStyle(settingsPanel).display === 'none';
+      // наполнить текущими справочниками
+      const cat  = loadDict('category');
+      const proj = loadDict('project');
+      const cash = loadDict('cashbox');
+      const cont = loadDict('contractor');
+      tCategory.value   = cat.join('\n');
+      tProject.value    = proj.join('\n');
+      tCashbox.value    = cash.join('\n');
+      tContractor.value = cont.join('\n');
+      settingsPanel.style.display = hiddenNow ? '' : 'none';
+      // обновим селекты формы
+      fillSelect(selCategory,  cat);
+      fillSelect(selProject,   proj);
+      fillSelect(selCashbox,   cash);
+      fillSelect(selContractor,cont);
     };
+
     saveDictsBtn.onclick = ()=>{
-      saveDict('category', tCategory.value.split('\n').map(s=>s.trim()).filter(Boolean));
-      saveDict('project', tProject.value.split('\n').map(s=>s.trim()).filter(Boolean));
-      saveDict('cashbox', tCashbox.value.split('\n').map(s=>s.trim()).filter(Boolean));
-      saveDict('contractor', tContractor.value.split('\n').map(s=>s.trim()).filter(Boolean));
+      const norm = s => s.split('\n').map(x=>x.trim()).filter(Boolean);
+      saveDict('category',  norm(tCategory.value));
+      saveDict('project',   norm(tProject.value));
+      saveDict('cashbox',   norm(tCashbox.value));
+      saveDict('contractor',norm(tContractor.value));
       alert('Справочники сохранены');
       settingsPanel.style.display='none';
+      // обновим селекты
+      fillSelect(selCategory,  loadDict('category'));
+      fillSelect(selProject,   loadDict('project'));
+      fillSelect(selCashbox,   loadDict('cashbox'));
+      fillSelect(selContractor,loadDict('contractor'));
     };
 
     opFilter.onchange = render;
@@ -298,9 +310,12 @@
       editingId = null;
       formTitle.textContent = 'Новая операция';
       editForm.reset();
-      // выставим сегодняшнюю дату
-      const today = new Date().toISOString().slice(0,10);
-      editForm.elements['date'].value = today;
+      editForm.elements['date'].value = new Date().toISOString().slice(0,10);
+      // обновим селекты из dicts
+      fillSelect(selCategory,  loadDict('category'));
+      fillSelect(selProject,   loadDict('project'));
+      fillSelect(selCashbox,   loadDict('cashbox'));
+      fillSelect(selContractor,loadDict('contractor'));
       openForm();
     };
 
@@ -308,7 +323,6 @@
     formSave.onclick = async ()=>{
       const fd = new FormData(editForm);
       const obj = {}; fd.forEach((v,k)=>{ if(String(v).trim()!=='') obj[k]=v; });
-      // сумма в число
       if (obj.amount!==undefined) obj.amount = Number(obj.amount);
       try{
         let r;
@@ -333,7 +347,7 @@
     bitrixCancel.onclick = ()=> bitrixBack.style.display='none';
     bitrixLink.onclick = async ()=>{
       const dealId = dealIdInput.value.trim();
-      if (!dealId) return;
+      if (!dealId) { alert('Введите ID сделки'); return; }
       try{
         const r = await fetch(API.linkBitrix(bitrixTargetId), {
           method:'POST',
@@ -367,16 +381,13 @@
         const amt = Number(x.amount||0);
         const d = x.date ? new Date(x.date) : null;
 
-        // касса
         if (cash!=='all' && (x.cashbox||'')!==cash) return false;
 
-        // дата
         if (d){
           if (df && d < df) return false;
           if (dt && d > dt) return false;
         }
 
-        // тип
         const future = isFuture(x.date);
         if (type==='income' && !(amt>0)) return false;
         if (type==='expense' && !(amt<0)) return false;
@@ -387,7 +398,6 @@
     }
 
     function renderTable(){
-      const tbody = document.getElementById('tbody');
       tbody.innerHTML='';
       let sumIn=0,sumOut=0;
 
@@ -471,6 +481,12 @@
       editingId = row.id;
       formTitle.textContent = 'Редактирование #' + row.id;
       editForm.reset();
+      // актуальные dicts
+      fillSelect(selCategory,  loadDict('category'));
+      fillSelect(selProject,   loadDict('project'));
+      fillSelect(selCashbox,   loadDict('cashbox'));
+      fillSelect(selContractor,loadDict('contractor'));
+      // значения
       editForm.elements['date'].value = row.date ? toISO(row.date) : '';
       editForm.elements['amount'].value = row.amount ?? '';
       editForm.elements['category'].value = row.category ?? '';
@@ -488,16 +504,7 @@
         const r = await fetch(API.list);
         const data = await r.json();
         all = Array.isArray(data) ? data : [];
-
-        // заполнить фильтр касс
         buildCashFilter();
-
-        // заполнить селекты из справочников
-        fillSelect(selCategory, loadDict('category'));
-        fillSelect(selProject, loadDict('project'));
-        fillSelect(selCashbox, loadDict('cashbox'));
-        fillSelect(selContractor, loadDict('contractor'));
-
         render();
       }catch(e){
         tbody.innerHTML = '<tr><td>Ошибка загрузки</td></tr>';
